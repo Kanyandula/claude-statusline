@@ -51,3 +51,27 @@ test('loadConfig: invalid JSON in user file falls back to defaults', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('loadConfig: project file overrides user file for conflicting keys', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const userFile = join(dir, 'u.json');
+  const projFile = join(dir, 'p.json');
+  writeFileSync(userFile, JSON.stringify({ layout: 'two-line', fields: { cost: false } }));
+  writeFileSync(projFile, JSON.stringify({ layout: 'single', fields: { cost: true } }));
+  try {
+    const cfg = loadConfig({ userPath: userFile, projectPath: projFile });
+    assert.equal(cfg.layout, 'single');         // project beats user
+    assert.equal(cfg.fields.cost, true);         // project beats user (deep)
+    assert.equal(cfg.fields.ctx, true);          // unchanged default survives
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadConfig: returned object is safe to mutate without affecting defaults', () => {
+  const cfg = loadConfig({});
+  cfg.layout = 'mutated';
+  cfg.fields.project = false;
+  assert.equal(DEFAULT_CONFIG.layout, 'two-line');
+  assert.equal(DEFAULT_CONFIG.fields.project, true);
+});

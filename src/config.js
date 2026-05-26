@@ -41,7 +41,11 @@ function deepMerge(base, over) {
 }
 
 export function loadConfig({ userPath, projectPath, env } = {}) {
-  let cfg = DEFAULT_CONFIG;
+  let cfg = {
+    layout: DEFAULT_CONFIG.layout,
+    fields: { ...DEFAULT_CONFIG.fields },
+    thresholds: { ...DEFAULT_CONFIG.thresholds },
+  };
   cfg = deepMerge(cfg, readJsonSafe(userPath));
   cfg = deepMerge(cfg, readJsonSafe(projectPath));
   // env overrides applied in Task 2; defaults + files only here
