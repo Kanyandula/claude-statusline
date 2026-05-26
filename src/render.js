@@ -1,37 +1,67 @@
 import { formatCost, formatDuration, formatPct, formatLoc } from './format.js';
 import { wrap, supportsColor } from './ansi.js';
+import { DEFAULT_CONFIG } from './config.js';
 
-function ctxColour(pct) {
+function ctxColour(pct, t) {
   if (pct == null) return 'dim';
-  if (pct >= 90) return 'red';
-  if (pct >= 70) return 'yellow';
+  if (pct >= t.ctxDangerPct) return 'red';
+  if (pct >= t.ctxWarnPct) return 'yellow';
   return 'green';
 }
 
-function costColour(usd) {
+function costColour(usd, t) {
   if (usd == null) return null;
-  if (usd >= 20) return 'red';
-  if (usd >= 5)  return 'yellow';
+  if (usd >= t.costDangerUsd) return 'red';
+  if (usd >= t.costWarnUsd) return 'yellow';
   return null;
 }
 
+function apiRatioStr(input) {
+  if (input.apiDurationMs == null || input.durationMs == null || input.durationMs <= 0) return '';
+  const pct = Math.round((input.apiDurationMs / input.durationMs) * 100);
+  return `🌐 ${pct}%`;
+}
+
 export function render(input, opts = {}) {
+  const config    = opts.config ?? DEFAULT_CONFIG;
   const useColour = opts.colour ?? supportsColor();
   const c = useColour ? wrap : (_clr, t) => t;
+  const f = config.fields;
+  const t = config.thresholds;
 
-  const project = input.projectName ? c('bold', input.projectName) : '';
-  const model   = input.modelName
-    ? c('magenta', `${input.modelName}${input.contextWindow ? ` (${input.contextWindow})` : ''}`)
-    : '';
+  const parts = {
+    project: (f.project && input.projectName) ? c('bold', input.projectName) : '',
+    branch:  (f.branch && input.branch)
+      ? c('cyan', `⎇ ${input.branch}${input.dirty ? c('red', '*') : ''}`)
+      : '',
+    model:   (f.model && input.modelName)
+      ? c('magenta', `${input.modelName}${input.contextWindow ? ` (${input.contextWindow})` : ''}`)
+      : '',
+    ctx:     (f.ctx && input.ctxPct != null)
+      ? c(ctxColour(input.ctxPct, t), `● ${formatPct(input.ctxPct)} ctx`)
+      : '',
+    duration: (f.duration && input.durationMs != null)
+      ? c('dim', `⏱ ${formatDuration(input.durationMs)}`)
+      : '',
+    cost: (() => {
+      if (!f.cost) return '';
+      const s = formatCost(input.costUsd);
+      if (!s) return '';
+      const clr = costColour(input.costUsd, t);
+      return clr ? c(clr, s) : s;
+    })(),
+    loc: (() => {
+      if (!f.loc) return '';
+      const s = formatLoc(input.linesAdded, input.linesRemoved);
+      return s ? c('dim', s) : '';
+    })(),
+    apiRatio:    f.apiRatio    ? c('dim', apiRatioStr(input)) : '',
+    outputStyle: (f.outputStyle && input.outputStyle) ? c('dim', `📐 ${input.outputStyle}`) : '',
+  };
 
-  const ctx       = input.ctxPct != null ? c(ctxColour(input.ctxPct), `● ${formatPct(input.ctxPct)} ctx`) : '';
-  const duration  = input.durationMs != null ? c('dim', `⏱ ${formatDuration(input.durationMs)}`) : '';
-  const costStr   = formatCost(input.costUsd);
-  const cost      = costStr ? (costColour(input.costUsd) ? c(costColour(input.costUsd), costStr) : costStr) : '';
-  const loc       = formatLoc(input.linesAdded, input.linesRemoved);
-  const locStr    = loc ? c('dim', loc) : '';
-
-  const line1 = ['▌', project, model].filter(Boolean).join('  ');
-  const line2 = ['  ', ctx, duration, cost, locStr].filter(Boolean).join('  ');
+  // Two-line layout only (single-line added in Task 5)
+  const line1 = ['▌', parts.project, parts.branch, parts.model].filter(Boolean).join('  ');
+  const line2 = ['  ', parts.ctx, parts.duration, parts.cost, parts.loc, parts.apiRatio, parts.outputStyle]
+    .filter(Boolean).join('  ');
   return `${line1}\n${line2}`;
 }
