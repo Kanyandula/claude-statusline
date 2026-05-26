@@ -30,3 +30,24 @@ test('claudeAdapter: partial input → missing fields are null', () => {
   assert.equal(out.contextWindow, '1M context');
   assert.equal(out.costUsd, null);
 });
+
+test('claudeAdapter: maps outputStyle from output_style.name', () => {
+  const out = claudeAdapter(sample);
+  assert.equal(out.outputStyle, 'explanatory');
+});
+
+test('claudeAdapter: maps apiDurationMs from cost.total_api_duration_ms', () => {
+  const out = claudeAdapter(sample);
+  assert.equal(out.apiDurationMs, 134721000);
+});
+
+test('claudeAdapter: missing output_style → null', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: 'Opus 4.7' } });
+  assert.equal(out.outputStyle, null);
+});
+
+test('claudeAdapter: branch and dirty default to null/false', () => {
+  const out = claudeAdapter(sample);
+  assert.equal(out.branch, null);
+  assert.equal(out.dirty, false);
+});
