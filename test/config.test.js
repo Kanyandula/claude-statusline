@@ -75,3 +75,41 @@ test('loadConfig: returned object is safe to mutate without affecting defaults',
   assert.equal(DEFAULT_CONFIG.layout, 'two-line');
   assert.equal(DEFAULT_CONFIG.fields.project, true);
 });
+
+test('loadConfig: env CLAUDE_STATUSLINE_LAYOUT overrides layout', () => {
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_LAYOUT: 'single' } });
+  assert.equal(cfg.layout, 'single');
+});
+
+test('loadConfig: env CLAUDE_STATUSLINE_LAYOUT ignores invalid value', () => {
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_LAYOUT: 'bogus' } });
+  assert.equal(cfg.layout, 'two-line');
+});
+
+test('loadConfig: env CLAUDE_STATUSLINE_FIELDS replaces field set', () => {
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_FIELDS: 'model,ctx,cost' } });
+  assert.equal(cfg.fields.model, true);
+  assert.equal(cfg.fields.ctx, true);
+  assert.equal(cfg.fields.cost, true);
+  assert.equal(cfg.fields.project, false);
+  assert.equal(cfg.fields.duration, false);
+  assert.equal(cfg.fields.loc, false);
+  assert.equal(cfg.fields.branch, false);
+});
+
+test('loadConfig: env CLAUDE_STATUSLINE_FIELDS empty value is ignored', () => {
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_FIELDS: '' } });
+  assert.equal(cfg.fields.project, true);
+});
+
+test('loadConfig: env overrides win over user file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'u.json');
+  writeFileSync(file, JSON.stringify({ layout: 'two-line' }));
+  try {
+    const cfg = loadConfig({ userPath: file, env: { CLAUDE_STATUSLINE_LAYOUT: 'single' } });
+    assert.equal(cfg.layout, 'single');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

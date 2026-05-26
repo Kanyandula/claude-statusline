@@ -40,6 +40,26 @@ function deepMerge(base, over) {
   return out;
 }
 
+function applyEnv(cfg, env) {
+  if (!env || typeof env !== 'object') return cfg;
+  let out = cfg;
+
+  const layout = env.CLAUDE_STATUSLINE_LAYOUT;
+  if (layout === 'single' || layout === 'two-line') {
+    out = { ...out, layout };
+  }
+
+  const fieldsCsv = env.CLAUDE_STATUSLINE_FIELDS;
+  if (typeof fieldsCsv === 'string' && fieldsCsv.trim()) {
+    const allowed = new Set(fieldsCsv.split(',').map(s => s.trim()).filter(Boolean));
+    const nextFields = {};
+    for (const k of Object.keys(out.fields)) nextFields[k] = allowed.has(k);
+    out = { ...out, fields: nextFields };
+  }
+
+  return out;
+}
+
 export function loadConfig({ userPath, projectPath, env } = {}) {
   let cfg = {
     layout: DEFAULT_CONFIG.layout,
@@ -48,6 +68,6 @@ export function loadConfig({ userPath, projectPath, env } = {}) {
   };
   cfg = deepMerge(cfg, readJsonSafe(userPath));
   cfg = deepMerge(cfg, readJsonSafe(projectPath));
-  // env overrides applied in Task 2; defaults + files only here
+  cfg = applyEnv(cfg, env);
   return cfg;
 }
