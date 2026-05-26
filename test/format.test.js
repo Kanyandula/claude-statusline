@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatCost, formatDuration } from '../src/format.js';
+import { formatCost, formatDuration, formatPct, formatLoc } from '../src/format.js';
 
 test('formatCost: typical value', () => {
   assert.equal(formatCost(19.01), '$19.01');
@@ -37,4 +37,28 @@ test('formatDuration: zero', () => {
 
 test('formatDuration: undefined → empty string', () => {
   assert.equal(formatDuration(undefined), '');
+});
+
+test('formatPct: integer', () => {
+  assert.equal(formatPct(15), '15%');
+});
+
+test('formatPct: rounds', () => {
+  assert.equal(formatPct(15.7), '16%');
+});
+
+test('formatPct: undefined → empty', () => {
+  assert.equal(formatPct(undefined), '');
+});
+
+test('formatLoc: typical', () => {
+  assert.equal(formatLoc(342, 89), '+342 / -89');
+});
+
+test('formatLoc: zero changes → empty', () => {
+  assert.equal(formatLoc(0, 0), '');
+});
+
+test('formatLoc: undefined values treated as zero, both zero → empty', () => {
+  assert.equal(formatLoc(undefined, undefined), '');
 });
