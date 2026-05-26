@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatCost } from '../src/format.js';
+import { formatCost, formatDuration } from '../src/format.js';
 
 test('formatCost: typical value', () => {
   assert.equal(formatCost(19.01), '$19.01');
@@ -16,4 +16,25 @@ test('formatCost: zero', () => {
 
 test('formatCost: undefined → empty string', () => {
   assert.equal(formatCost(undefined), '');
+});
+
+test('formatDuration: typical long session matches screenshot', () => {
+  // 172977000 ms = 2882 min 57 sec
+  assert.equal(formatDuration(172977000), '2882m57s');
+});
+
+test('formatDuration: short session', () => {
+  assert.equal(formatDuration(65000), '1m5s');
+});
+
+test('formatDuration: under a minute', () => {
+  assert.equal(formatDuration(7000), '0m7s');
+});
+
+test('formatDuration: zero', () => {
+  assert.equal(formatDuration(0), '0m0s');
+});
+
+test('formatDuration: undefined → empty string', () => {
+  assert.equal(formatDuration(undefined), '');
 });
