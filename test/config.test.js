@@ -113,3 +113,25 @@ test('loadConfig: env overrides win over user file', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('loadConfig: env CLAUDE_STATUSLINE_LAYOUT=null is ignored', () => {
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_LAYOUT: null } });
+  assert.equal(cfg.layout, 'two-line');
+});
+
+test('loadConfig: env CLAUDE_STATUSLINE_FIELDS whitespace-only is ignored', () => {
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_FIELDS: '   ' } });
+  assert.equal(cfg.fields.project, true);
+});
+
+test('loadConfig: env CLAUDE_STATUSLINE_FIELDS unknown field names are silently dropped', () => {
+  // Documents the contract: typos / unknown field names do NOT enable anything
+  // and do NOT throw. Only listed names matching real fields take effect.
+  const cfg = loadConfig({ env: { CLAUDE_STATUSLINE_FIELDS: 'model,typo,nonexistent' } });
+  assert.equal(cfg.fields.model, true);
+  assert.equal(cfg.fields.project, false);
+  assert.equal(cfg.fields.ctx, false);
+  // unknown keys do not leak onto the fields object
+  assert.equal(cfg.fields.typo, undefined);
+  assert.equal(cfg.fields.nonexistent, undefined);
+});
