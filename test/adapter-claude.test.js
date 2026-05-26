@@ -12,9 +12,11 @@ test('claudeAdapter: maps every field from the sample', () => {
   assert.equal(out.contextWindow, '1M context');
   assert.equal(out.costUsd, 19.01);
   assert.equal(out.durationMs, 172977000);
+  assert.equal(out.apiDurationMs, 134721000);
   assert.equal(out.ctxPct, 15);
   assert.equal(out.linesAdded, 342);
   assert.equal(out.linesRemoved, 89);
+  assert.equal(out.outputStyle, 'explanatory');
 });
 
 test('claudeAdapter: null input → all fields null', () => {

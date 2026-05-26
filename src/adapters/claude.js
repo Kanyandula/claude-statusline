@@ -16,6 +16,8 @@ export function claudeAdapter(raw) {
     linesAdded:    typeof r.cost?.total_lines_added === 'number' ? r.cost.total_lines_added : null,
     linesRemoved:  typeof r.cost?.total_lines_removed === 'number' ? r.cost.total_lines_removed : null,
     outputStyle:   r.output_style?.name ?? null,
+    // branch/dirty default here so render() never needs null guards;
+    // pipeline overlays real git info before render is called.
     branch:        null,
     dirty:         false,
   };
