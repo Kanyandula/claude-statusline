@@ -1,0 +1,16 @@
+{
+  "name": "claude-statusline",
+  "version": "0.0.1",
+  "description": "A configurable statusline for Claude Code.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "bin": {
+    "claude-statusline": "./bin/claude-statusline.js",
+    "claude-statusline-render": "./bin/statusline.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": ["bin/", "src/"],
+  "license": "MIT"
+}
