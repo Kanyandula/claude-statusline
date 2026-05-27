@@ -1,11 +1,22 @@
 const RULES = [
-  { match: /opus/i,   label: '1M context' },
-  { match: /sonnet/i, label: '1M context' },
-  { match: /haiku/i,  label: '200K context' },
+  { match: /opus/i,   long: '1M context',   short: '1M' },
+  { match: /sonnet/i, long: '1M context',   short: '1M' },
+  { match: /haiku/i,  long: '200K context', short: '200K' },
 ];
 
-export function contextWindowLabel(modelId) {
+const DEFAULT_LONG  = '200K context';
+const DEFAULT_SHORT = '200K';
+
+function lookup(modelId, key, fallback) {
   if (!modelId) return '';
-  for (const r of RULES) if (r.match.test(modelId)) return r.label;
-  return '200K context';
+  for (const r of RULES) if (r.match.test(modelId)) return r[key];
+  return fallback;
+}
+
+export function contextWindowLabel(modelId) {
+  return lookup(modelId, 'long', DEFAULT_LONG);
+}
+
+export function contextWindowShortLabel(modelId) {
+  return lookup(modelId, 'short', DEFAULT_SHORT);
 }

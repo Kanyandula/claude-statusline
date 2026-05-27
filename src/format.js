@@ -16,9 +16,9 @@ export function formatPct(n) {
   return `${Math.round(n)}%`;
 }
 
-export function formatLoc(added, removed) {
+export function formatLoc(added, removed, opts = {}) {
   const a = typeof added === 'number' ? added : 0;
   const r = typeof removed === 'number' ? removed : 0;
   if (a === 0 && r === 0) return '';
-  return `+${a} / -${r}`;
+  return opts.compact ? `+${a}/-${r}` : `+${a} / -${r}`;
 }

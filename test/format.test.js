@@ -62,3 +62,15 @@ test('formatLoc: zero changes → empty', () => {
 test('formatLoc: undefined values treated as zero, both zero → empty', () => {
   assert.equal(formatLoc(undefined, undefined), '');
 });
+
+test('formatLoc: compact mode uses no spaces', () => {
+  assert.equal(formatLoc(342, 89, { compact: true }), '+342/-89');
+});
+
+test('formatLoc: compact + zero changes → empty', () => {
+  assert.equal(formatLoc(0, 0, { compact: true }), '');
+});
+
+test('formatLoc: default (non-compact) unchanged', () => {
+  assert.equal(formatLoc(342, 89), '+342 / -89');
+});

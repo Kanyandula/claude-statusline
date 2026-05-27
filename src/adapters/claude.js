@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { contextWindowLabel } from '../models.js';
+import { contextWindowLabel, contextWindowShortLabel } from '../models.js';
 
 export function claudeAdapter(raw) {
   const r = raw || {};
@@ -9,6 +9,7 @@ export function claudeAdapter(raw) {
     projectName:   cwd ? basename(cwd) : null,
     modelName:     r.model?.display_name ?? null,
     contextWindow: modelId ? contextWindowLabel(modelId) : null,
+    contextShort:  modelId ? contextWindowShortLabel(modelId) : null,
     costUsd:       typeof r.cost?.total_cost_usd === 'number' ? r.cost.total_cost_usd : null,
     durationMs:    typeof r.cost?.total_duration_ms === 'number' ? r.cost.total_duration_ms : null,
     apiDurationMs: typeof r.cost?.total_api_duration_ms === 'number' ? r.cost.total_api_duration_ms : null,

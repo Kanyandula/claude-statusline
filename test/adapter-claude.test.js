@@ -53,3 +53,13 @@ test('claudeAdapter: branch and dirty default to null/false', () => {
   assert.equal(out.branch, null);
   assert.equal(out.dirty, false);
 });
+
+test('claudeAdapter: maps contextShort from model id', () => {
+  const out = claudeAdapter(sample);
+  assert.equal(out.contextShort, '1M');
+});
+
+test('claudeAdapter: contextShort null when no model id', () => {
+  const out = claudeAdapter({});
+  assert.equal(out.contextShort, null);
+});

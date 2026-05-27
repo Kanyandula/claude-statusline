@@ -65,15 +65,10 @@ export function render(input, opts = {}) {
 
   if (config.layout === 'single') {
     const compactModel = (f.model && input.modelName)
-      ? c('magenta', `${input.modelName}${input.contextWindow ? ` (${input.contextWindow.replace(' context', '')})` : ''}`)
+      ? c('magenta', `${input.modelName}${input.contextShort ? ` (${input.contextShort})` : ''}`)
       : '';
-    const compactLoc = (() => {
-      if (!f.loc) return '';
-      const a = typeof input.linesAdded === 'number' ? input.linesAdded : 0;
-      const r = typeof input.linesRemoved === 'number' ? input.linesRemoved : 0;
-      if (a === 0 && r === 0) return '';
-      return c('dim', `+${a}/-${r}`);
-    })();
+    const compactLocStr = f.loc ? formatLoc(input.linesAdded, input.linesRemoved, { compact: true }) : '';
+    const compactLoc = compactLocStr ? c('dim', compactLocStr) : '';
     return ['▌', parts.project, parts.branch, compactModel, parts.ctx, parts.duration, parts.cost,
             compactLoc, parts.apiRatio, parts.outputStyle].filter(Boolean).join('  ');
   }
