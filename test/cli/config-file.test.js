@@ -74,3 +74,14 @@ test('setKeyPath: replaces non-object intermediate', () => {
   setKeyPath(obj, 'fields.cost', false);
   assert.deepEqual(obj, { fields: { cost: false } });
 });
+
+test('coerceValue: whitespace-only string stays a string (not 0)', () => {
+  assert.equal(coerceValue('   '), '   ');
+  assert.equal(coerceValue(' '), ' ');
+});
+
+test('coerceValue: Infinity / -Infinity / NaN literals stay strings', () => {
+  assert.equal(coerceValue('Infinity'), 'Infinity');
+  assert.equal(coerceValue('-Infinity'), '-Infinity');
+  assert.equal(coerceValue('NaN'), 'NaN');
+});

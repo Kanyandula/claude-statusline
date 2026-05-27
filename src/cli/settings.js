@@ -1,11 +1,15 @@
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { atomicWriteJson } from './fs-util.js';
 
 const SL_KEY = 'statusLine';
 
 function readJson(path) {
   if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, 'utf8'));
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (e) {
+    throw new Error(`Invalid JSON in ${path}: ${e.message}`);
+  }
 }
 
 function backupOnce(path) {
@@ -15,23 +19,16 @@ function backupOnce(path) {
   if (!existsSync(bak)) writeFileSync(bak, readFileSync(path));
 }
 
-function atomicWrite(path, obj) {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
-  renameSync(tmp, path);
-}
-
-export function getStatusLine(settingsPath) {
+export function readStatusLine(settingsPath) {
   const s = readJson(settingsPath);
   return s ? s[SL_KEY] ?? null : null;
 }
 
-export function setStatusLine(settingsPath, value) {
+export function writeStatusLine(settingsPath, value) {
   const s = readJson(settingsPath) ?? {};
   backupOnce(settingsPath);
   s[SL_KEY] = value;
-  atomicWrite(settingsPath, s);
+  atomicWriteJson(settingsPath, s);
 }
 
 export function removeStatusLine(settingsPath) {
@@ -39,6 +36,6 @@ export function removeStatusLine(settingsPath) {
   if (!s || !(SL_KEY in s)) return false;
   backupOnce(settingsPath);
   delete s[SL_KEY];
-  atomicWrite(settingsPath, s);
+  atomicWriteJson(settingsPath, s);
   return true;
 }

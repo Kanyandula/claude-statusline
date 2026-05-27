@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { atomicWriteJson } from './fs-util.js';
 
 export function readConfigFile(path) {
   if (!existsSync(path)) return {};
@@ -13,25 +13,24 @@ export function readConfigFile(path) {
 }
 
 export function writeConfigFile(path, obj) {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
-  renameSync(tmp, path);
+  atomicWriteJson(path, obj);
 }
 
 export function deleteConfigFile(path) {
   if (existsSync(path)) unlinkSync(path);
 }
 
-// Coerces a CLI-arg string into its natural type so `set thresholds.costWarnUsd 5`
-// stores 5 (number) not '5' (string). 'true'/'false'/'null' → boolean/null;
-// numeric strings → number; otherwise raw string.
+// Coerces a CLI-arg string into its natural type. Guards against weird
+// JavaScript-isms: whitespace-only strings coerce to 0, 'Infinity' coerces
+// to a JSON-unfriendly value — both treated as strings.
 export function coerceValue(raw) {
   if (typeof raw !== 'string') return raw;
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   if (raw === 'null') return null;
-  if (raw !== '' && !Number.isNaN(Number(raw))) return Number(raw);
+  if (raw.trim() === '') return raw;
+  const n = Number(raw);
+  if (Number.isFinite(n)) return n;
   return raw;
 }
 
