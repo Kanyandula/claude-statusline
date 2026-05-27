@@ -84,3 +84,31 @@ test('claudeAdapter: display_name with parens but unknown short label still pars
   assert.equal(out.contextWindow, '500K context');
   assert.equal(out.contextShort, '500K');
 });
+
+test('claudeAdapter: multi-parens display_name falls back (no mis-split)', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: 'Foo (bar) (baz)' } });
+  // Strict grammar rejects multi-parens; full string kept as base, label via model-id
+  assert.equal(out.modelName, 'Foo (bar) (baz)');
+  assert.equal(out.contextWindow, '1M context');
+  assert.equal(out.contextShort, '1M');
+});
+
+test('claudeAdapter: empty parens display_name falls back', () => {
+  const out = claudeAdapter({ model: { id: 'claude-haiku-4-5', display_name: 'Foo ()' } });
+  assert.equal(out.modelName, 'Foo ()');
+  assert.equal(out.contextWindow, '200K context');
+});
+
+test('claudeAdapter: display_name with trailing junk after parens falls back', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: 'Foo (1M) [v2]' } });
+  assert.equal(out.modelName, 'Foo (1M) [v2]');
+  assert.equal(out.contextWindow, '1M context');
+});
+
+test('claudeAdapter: display_name with paren followed by closing context label still parses', () => {
+  // Sanity check that the tightening didn't break the common happy path
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7[1m]', display_name: 'Opus 4.7 (1M context)' } });
+  assert.equal(out.modelName, 'Opus 4.7');
+  assert.equal(out.contextWindow, '1M context');
+  assert.equal(out.contextShort, '1M');
+});

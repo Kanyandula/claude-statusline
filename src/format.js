@@ -4,7 +4,7 @@ export function formatCost(usd) {
 }
 
 export function formatDuration(ms) {
-  if (typeof ms !== 'number' || Number.isNaN(ms)) return '';
+  if (typeof ms !== 'number' || Number.isNaN(ms) || ms < 0) return '';
   const totalSeconds = Math.floor(ms / 1000);
   if (totalSeconds < 60) return `${totalSeconds}s`;
   const totalMinutes = Math.floor(totalSeconds / 60);

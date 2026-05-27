@@ -48,6 +48,19 @@ test('formatDuration: undefined → empty string', () => {
   assert.equal(formatDuration(undefined), '');
 });
 
+test('formatDuration: negative → empty string (clock skew guard)', () => {
+  assert.equal(formatDuration(-1000), '');
+  assert.equal(formatDuration(-1), '');
+});
+
+test('formatDuration: exactly 60_000 ms boundary → 1m0s (not 60s)', () => {
+  assert.equal(formatDuration(60000), '1m0s');
+});
+
+test('formatDuration: exactly 3_600_000 ms boundary → 1h0m', () => {
+  assert.equal(formatDuration(3600000), '1h0m');
+});
+
 test('formatPct: integer', () => {
   assert.equal(formatPct(15), '15%');
 });

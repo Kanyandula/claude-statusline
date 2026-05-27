@@ -4,16 +4,26 @@ import { contextWindowLabel, contextWindowShortLabel } from '../models.js';
 // Claude's `model.display_name` may already include a trailing context-window
 // label like "Opus 4.7 (1M context)". Split it so the renderer can pick the
 // right form per layout without doubling up.
+//
+// Grammar (deliberately strict): `<base>` followed by one paren-group at end.
+// The base AND the paren content are both `[^()]+`, so:
+//   - multi-paren strings like "Foo (bar) (baz)" don't match → fallback
+//   - empty parens "Foo ()" don't match → fallback
+//   - trailing junk "Foo (1M) [v2]" doesn't match → fallback
+// The fallback keeps the raw display_name as base and uses model.id for label.
+const PAREN_GRAMMAR = /^([^()]+?)\s*\(([^()]+)\)\s*$/;
+const CONTEXT_SUFFIX = /\s*context\s*$/i;
+
 function splitDisplayName(displayName, modelId) {
   if (!displayName) return { base: null, long: null, short: null };
-  const m = displayName.match(/^(.+?)\s*\((.+)\)\s*$/);
+  const m = displayName.match(PAREN_GRAMMAR);
   if (m) {
     const base = m[1];
     const long = m[2];
-    const short = long.replace(/\s*context\s*$/i, '');
+    const short = long.replace(CONTEXT_SUFFIX, '');
     return { base, long, short };
   }
-  // No parens in display_name — fall back to model-id lookup
+  // Unparseable display_name — keep the raw string and fall back to model-id lookup.
   return {
     base:  displayName,
     long:  modelId ? contextWindowLabel(modelId) || null : null,
