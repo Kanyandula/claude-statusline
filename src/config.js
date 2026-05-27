@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
 
 export const DEFAULT_CONFIG = {
   layout: 'two-line',
@@ -13,8 +14,18 @@ export const DEFAULT_CONFIG = {
   },
 };
 
+// Defence against CLAUDE_STATUSLINE_CONFIG (or any other caller) pointing the
+// loader at arbitrary files like /etc/passwd or ~/.ssh/* whose accidental
+// JSON-shaped content could leak into our config. Require:
+//   - string path
+//   - absolute (no relative-path surprises from cwd-switching)
+//   - .json extension (narrows the surface to files explicitly typed as config)
+function isAllowedConfigPath(p) {
+  return typeof p === 'string' && p.length > 0 && isAbsolute(p) && /\.json$/i.test(p);
+}
+
 function readJsonSafe(path) {
-  if (!path) return null;
+  if (!isAllowedConfigPath(path)) return null;
   try {
     const raw = readFileSync(path, 'utf8');
     const parsed = JSON.parse(raw);

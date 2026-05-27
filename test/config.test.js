@@ -135,3 +135,34 @@ test('loadConfig: env CLAUDE_STATUSLINE_FIELDS unknown field names are silently 
   assert.equal(cfg.fields.typo, undefined);
   assert.equal(cfg.fields.nonexistent, undefined);
 });
+
+test('loadConfig: rejects non-absolute userPath (path validation)', () => {
+  // A relative path could resolve unexpectedly depending on cwd.
+  const cfg = loadConfig({ userPath: 'relative/path.json' });
+  assert.deepEqual(cfg, DEFAULT_CONFIG);
+});
+
+test('loadConfig: rejects non-.json extension (arbitrary file read defence)', () => {
+  // An attacker who can set CLAUDE_STATUSLINE_CONFIG could point it at
+  // /etc/passwd, ~/.ssh/id_ed25519, ~/.aws/credentials, etc. Requiring
+  // a .json extension narrows the read surface to files explicitly typed
+  // as config.
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'secret.txt');
+  writeFileSync(file, JSON.stringify({ layout: 'single' })); // valid JSON, wrong extension
+  try {
+    const cfg = loadConfig({ userPath: file });
+    assert.deepEqual(cfg, DEFAULT_CONFIG);
+    assert.equal(cfg.layout, 'two-line'); // proves the .txt was NOT loaded
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('loadConfig: rejects projectPath with non-.json extension', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'config.ini');
+  writeFileSync(file, JSON.stringify({ layout: 'single' }));
+  try {
+    const cfg = loadConfig({ projectPath: file });
+    assert.equal(cfg.layout, 'two-line');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
