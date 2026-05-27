@@ -142,3 +142,48 @@ test('render: ESC sequences in modelName/contextWindow are stripped', () => {
   assert.doesNotMatch(out, /\x1b\[2J/);
   assert.doesNotMatch(out, /\x07/);
 });
+
+// Colour regression tests — pin the specific ANSI codes for each part so a
+// silent revert of the colour rework would be caught.
+test('render colour: ▌ prefix uses dim (code 2)', () => {
+  const out = render(claudeAdapter(sample), { colour: true });
+  assert.match(out, /\x1b\[2m▌\x1b\[0m/);
+});
+
+test('render colour: │ separator uses dim (code 2)', () => {
+  const out = render(claudeAdapter(sample), { colour: true });
+  assert.match(out, /\x1b\[2m│\x1b\[0m/);
+});
+
+test('render colour: project uses bold+brightMagenta (codes 1;95)', () => {
+  const out = render(claudeAdapter(sample), { colour: true });
+  assert.match(out, /\x1b\[1;95mmyproject\x1b\[0m/);
+});
+
+test('render colour: branch uses bold+brightCyan (codes 1;96), dirty uses brightRed (91)', () => {
+  const input = { ...claudeAdapter(sample), branch: 'main', dirty: true };
+  const out = render(input, { colour: true, config: DEFAULT_CONFIG });
+  assert.match(out, /\x1b\[1;96m⎇ main\x1b\[0m/);
+  assert.match(out, /\x1b\[91m\*\x1b\[0m/);
+});
+
+test('render colour: model uses bold+brightBlue (codes 1;94)', () => {
+  const out = render(claudeAdapter(sample), { colour: true });
+  assert.match(out, /\x1b\[1;94mOpus 4\.7 \(1M context\)\x1b\[0m/);
+});
+
+test('render colour: duration uses yellow (code 33)', () => {
+  const out = render(claudeAdapter(sample), { colour: true });
+  assert.match(out, /\x1b\[33m⏱ 48h2m\x1b\[0m/);
+});
+
+test('render colour: LOC uses yellow (code 33)', () => {
+  const out = render(claudeAdapter(sample), { colour: true });
+  assert.match(out, /\x1b\[33m\+342 \/ -89\x1b\[0m/);
+});
+
+test('render colour: single-layout compact LOC also uses yellow', () => {
+  const cfg = { ...DEFAULT_CONFIG, layout: 'single' };
+  const out = render(claudeAdapter(sample), { colour: true, config: cfg });
+  assert.match(out, /\x1b\[33m\+342\/-89\x1b\[0m/);
+});
