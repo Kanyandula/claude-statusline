@@ -88,3 +88,27 @@ test('render: apiRatio with durationMs=0 produces no stray ANSI', () => {
   // No empty-wrap ANSI artifact:
   assert.doesNotMatch(out, /\x1b\[2m\x1b\[0m/);
 });
+
+test('render: single-line layout produces exactly one line', () => {
+  const cfg = { ...DEFAULT_CONFIG, layout: 'single' };
+  const out = render(claudeAdapter(sample), { colour: false, config: cfg });
+  assert.equal(out.split('\n').length, 1);
+});
+
+test('render: single-line uses short context window label', () => {
+  const cfg = { ...DEFAULT_CONFIG, layout: 'single' };
+  const out = render(claudeAdapter(sample), { colour: false, config: cfg });
+  assert.match(out, /Opus 4\.7 \(1M\)/);
+  assert.doesNotMatch(out, /Opus 4\.7 \(1M context\)/);
+});
+
+test('render: single-line uses compact LOC format', () => {
+  const cfg = { ...DEFAULT_CONFIG, layout: 'single' };
+  const out = render(claudeAdapter(sample), { colour: false, config: cfg });
+  assert.match(out, /\+342\/-89/);
+});
+
+test('render: two-line layout still produces two lines (regression)', () => {
+  const out = render(claudeAdapter(sample), { colour: false });
+  assert.equal(out.split('\n').length, 2);
+});
