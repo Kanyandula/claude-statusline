@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { wrap, supportsColor } from '../src/ansi.js';
+import { wrap, supportsColor, stripControlChars } from '../src/ansi.js';
 
 test('wrap: red text', () => {
   assert.equal(wrap('red', 'foo'), '\x1b[31mfoo\x1b[0m');
@@ -40,4 +40,37 @@ test('supportsColor: piped stdin (not a TTY) → true, assuming host renders ANS
     if (prevNo !== undefined) process.env.NO_COLOR = prevNo;
     if (prevForce !== undefined) process.env.FORCE_COLOR = prevForce;
   }
+});
+
+test('stripControlChars: removes ESC and CSI sequences', () => {
+  assert.equal(stripControlChars('foo\x1b[2Jbar'), 'foo[2Jbar');
+});
+
+test('stripControlChars: removes OSC + BEL', () => {
+  assert.equal(stripControlChars('hi\x1b]0;TITLE\x07ok'), 'hi]0;TITLEok');
+});
+
+test('stripControlChars: removes DEL and C1 controls', () => {
+  assert.equal(stripControlChars('a\x7fb\x9cc'), 'abc');
+});
+
+test('stripControlChars: leaves normal text + UTF-8 + emoji intact', () => {
+  assert.equal(stripControlChars('main feature/abc 🚀'), 'main feature/abc 🚀');
+});
+
+test('stripControlChars: non-string passthrough', () => {
+  assert.equal(stripControlChars(null), null);
+  assert.equal(stripControlChars(undefined), undefined);
+});
+
+test('wrap: array of styles emits combined ANSI sequence', () => {
+  assert.equal(wrap(['bold', 'cyan'], 'x'), '\x1b[1;36mx\x1b[0m');
+});
+
+test('wrap: array with one unknown key keeps the valid one', () => {
+  assert.equal(wrap(['bold', 'mauve'], 'x'), '\x1b[1mx\x1b[0m');
+});
+
+test('wrap: empty array → text passthrough', () => {
+  assert.equal(wrap([], 'x'), 'x');
 });

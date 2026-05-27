@@ -112,3 +112,33 @@ test('render: two-line layout still produces two lines (regression)', () => {
   const out = render(claudeAdapter(sample), { colour: false });
   assert.equal(out.split('\n').length, 2);
 });
+
+test('render: ESC sequences in branch are stripped (no terminal injection)', () => {
+  // A malicious branch name could otherwise clear the terminal, set its
+  // title, or render its own colours into our statusline.
+  const input = { ...claudeAdapter(sample), branch: 'evil\x1b[2J\x1b]0;PWNED\x07', dirty: false };
+  const out = render(input, { colour: false, config: DEFAULT_CONFIG });
+  assert.doesNotMatch(out, /\x1b\[2J/);
+  assert.doesNotMatch(out, /\x1b\]0;/);
+  assert.doesNotMatch(out, /\x07/);
+});
+
+test('render: ESC sequences in outputStyle are stripped', () => {
+  const cfg = { ...DEFAULT_CONFIG, fields: { ...DEFAULT_CONFIG.fields, outputStyle: true } };
+  const input = { ...claudeAdapter(sample), outputStyle: 'fake\x1b[31mRED\x1b[0m' };
+  const out = render(input, { colour: false, config: cfg });
+  assert.doesNotMatch(out, /\x1b\[31m/);
+});
+
+test('render: ESC sequences in projectName are stripped', () => {
+  const input = { ...claudeAdapter(sample), projectName: 'proj\x1b[2Jbar' };
+  const out = render(input, { colour: false, config: DEFAULT_CONFIG });
+  assert.doesNotMatch(out, /\x1b\[2J/);
+});
+
+test('render: ESC sequences in modelName/contextWindow are stripped', () => {
+  const input = { ...claudeAdapter(sample), modelName: 'Mod\x1b[2J', contextWindow: 'Ctx\x07' };
+  const out = render(input, { colour: false, config: DEFAULT_CONFIG });
+  assert.doesNotMatch(out, /\x1b\[2J/);
+  assert.doesNotMatch(out, /\x07/);
+});

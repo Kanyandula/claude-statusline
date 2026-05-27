@@ -15,6 +15,17 @@ export function wrap(style, text) {
   return `\x1b[${codes.join(';')}m${text}\x1b[0m`;
 }
 
+// Strip C0 (0x00–0x1F), DEL (0x7F), and C1 (0x80–0x9F) control characters
+// from a string. User-supplied data (git branch names, output_style.name,
+// etc.) flowing into ANSI output could otherwise carry their own ESC
+// sequences — e.g. a branch named `foo\x1b]0;PWNED\x07` would set the
+// terminal title. Sanitise everything that originates outside our codebase
+// before it touches wrap().
+export function stripControlChars(s) {
+  if (typeof s !== 'string') return s;
+  return s.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+}
+
 export function supportsColor() {
   if (process.env.NO_COLOR) return false;
   if (process.env.FORCE_COLOR) return true;

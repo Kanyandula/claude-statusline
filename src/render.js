@@ -1,6 +1,9 @@
 import { formatCost, formatDuration, formatPct, formatLoc } from './format.js';
-import { wrap, supportsColor } from './ansi.js';
+import { wrap, supportsColor, stripControlChars } from './ansi.js';
 import { DEFAULT_CONFIG } from './config.js';
+
+// Sanitiser alias for user-supplied strings that flow through wrap().
+const safe = stripControlChars;
 
 function ctxColour(pct, t) {
   if (pct == null) return 'dim';
@@ -30,12 +33,12 @@ export function render(input, opts = {}) {
   const t = config.thresholds;
 
   const parts = {
-    project: (f.project && input.projectName) ? c(['bold', 'brightMagenta'], input.projectName) : '',
+    project: (f.project && input.projectName) ? c(['bold', 'brightMagenta'], safe(input.projectName)) : '',
     branch:  (f.branch && input.branch)
-      ? `${c(['bold', 'brightCyan'], `⎇ ${input.branch}`)}${input.dirty ? c('brightRed', '*') : ''}`
+      ? `${c(['bold', 'brightCyan'], `⎇ ${safe(input.branch)}`)}${input.dirty ? c('brightRed', '*') : ''}`
       : '',
     model:   (f.model && input.modelName)
-      ? c(['bold', 'brightBlue'], `${input.modelName}${input.contextWindow ? ` (${input.contextWindow})` : ''}`)
+      ? c(['bold', 'brightBlue'], `${safe(input.modelName)}${input.contextWindow ? ` (${safe(input.contextWindow)})` : ''}`)
       : '',
     ctx:     (f.ctx && input.ctxPct != null)
       ? c(ctxColour(input.ctxPct, t), `● ${formatPct(input.ctxPct)} ctx`)
@@ -60,7 +63,7 @@ export function render(input, opts = {}) {
       const s = apiRatioStr(input);
       return s ? c('yellow', s) : '';
     })(),
-    outputStyle: (f.outputStyle && input.outputStyle) ? c('yellow', `📐 ${input.outputStyle}`) : '',
+    outputStyle: (f.outputStyle && input.outputStyle) ? c('yellow', `📐 ${safe(input.outputStyle)}`) : '',
   };
 
   const bar    = c('dim', '▌');
@@ -68,7 +71,7 @@ export function render(input, opts = {}) {
 
   if (config.layout === 'single') {
     const compactModel = (f.model && input.modelName)
-      ? c(['bold', 'brightBlue'], `${input.modelName}${input.contextShort ? ` (${input.contextShort})` : ''}`)
+      ? c(['bold', 'brightBlue'], `${safe(input.modelName)}${input.contextShort ? ` (${safe(input.contextShort)})` : ''}`)
       : '';
     const compactLocStr = f.loc ? formatLoc(input.linesAdded, input.linesRemoved, { compact: true }) : '';
     const compactLoc = compactLocStr ? c('yellow', compactLocStr) : '';
