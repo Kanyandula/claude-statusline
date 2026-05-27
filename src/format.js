@@ -6,9 +6,12 @@ export function formatCost(usd) {
 export function formatDuration(ms) {
   if (typeof ms !== 'number' || Number.isNaN(ms)) return '';
   const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m${seconds}s`;
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m${totalSeconds % 60}s`;
+  const hours   = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h${minutes}m`;
 }
 
 export function formatPct(n) {

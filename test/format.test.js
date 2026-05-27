@@ -18,21 +18,30 @@ test('formatCost: undefined → empty string', () => {
   assert.equal(formatCost(undefined), '');
 });
 
-test('formatDuration: typical long session matches screenshot', () => {
-  // 172977000 ms = 2882 min 57 sec
-  assert.equal(formatDuration(172977000), '2882m57s');
+test('formatDuration: ≥1h uses h/m format', () => {
+  // 172977000 ms ≈ 2882m57s ≈ 48h2m
+  assert.equal(formatDuration(172977000), '48h2m');
 });
 
-test('formatDuration: short session', () => {
+test('formatDuration: exactly 1 hour', () => {
+  assert.equal(formatDuration(3600000), '1h0m');
+});
+
+test('formatDuration: 23h54m', () => {
+  // 23*3600 + 54*60 = 86040 seconds
+  assert.equal(formatDuration(86040000), '23h54m');
+});
+
+test('formatDuration: between 1min and 1h uses m/s format', () => {
   assert.equal(formatDuration(65000), '1m5s');
 });
 
-test('formatDuration: under a minute', () => {
-  assert.equal(formatDuration(7000), '0m7s');
+test('formatDuration: under a minute uses s only', () => {
+  assert.equal(formatDuration(7000), '7s');
 });
 
 test('formatDuration: zero', () => {
-  assert.equal(formatDuration(0), '0m0s');
+  assert.equal(formatDuration(0), '0s');
 });
 
 test('formatDuration: undefined → empty string', () => {

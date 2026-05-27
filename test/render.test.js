@@ -14,7 +14,7 @@ test('render: two-line layout (no colour) matches expected text', () => {
   assert.match(lines[0], /myproject/);
   assert.match(lines[0], /Opus 4\.7 \(1M context\)/);
   assert.match(lines[1], /15% ctx/);
-  assert.match(lines[1], /2882m57s/);
+  assert.match(lines[1], /48h2m/);
   assert.match(lines[1], /\$19\.01/);
   assert.match(lines[1], /\+342 \/ -89/);
 });
