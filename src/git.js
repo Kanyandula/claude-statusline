@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-const TIMEOUT_MS = 200;
+const TIMEOUT_MS = 200; // per-call cap; statusline runs on every prompt
 
 function gitCmd(cwd, args) {
   const r = spawnSync('git', args, { cwd, timeout: TIMEOUT_MS, encoding: 'utf8' });
@@ -16,5 +16,6 @@ export function getGitInfo(cwd) {
   const branch = gitCmd(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
   if (branch === null) return null;
   const status = gitCmd(cwd, ['status', '--porcelain']);
-  return { branch, dirty: status !== null && status.length > 0 };
+  if (status === null) return null;
+  return { branch, dirty: status.length > 0 };
 }

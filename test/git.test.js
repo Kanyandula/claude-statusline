@@ -47,3 +47,13 @@ test('getGitInfo: missing cwd returns null', () => {
   assert.equal(getGitInfo(null), null);
   assert.equal(getGitInfo('/does/not/exist'), null);
 });
+
+test('getGitInfo: git binary failure → null (not silent dirty=false)', () => {
+  // Simulate by passing an existing dir that is NOT a git repo — the
+  // is-inside-work-tree check fails first, so we get null. This guards
+  // against any future refactor that lets a partial git failure leak through.
+  const dir = mkdtempSync(join(tmpdir(), 'csgit-partial-'));
+  try {
+    assert.equal(getGitInfo(dir), null);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
