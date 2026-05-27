@@ -25,6 +25,15 @@ function apiRatioStr(input) {
   return `🌐 ${pct}%`;
 }
 
+// Build the model+context label. `ctxLabel` is the long form ("1M context")
+// for two-line layout and the short form ("1M") for single-line — both use
+// the same colour and sanitiser, so callers just pick the label.
+function modelPart(input, ctxLabel, enabled, c) {
+  if (!enabled || !input.modelName) return '';
+  const ctx = ctxLabel ? ` (${safe(ctxLabel)})` : '';
+  return c(['bold', 'brightBlue'], `${safe(input.modelName)}${ctx}`);
+}
+
 export function render(input, opts = {}) {
   const config    = opts.config ?? DEFAULT_CONFIG;
   const useColour = opts.colour ?? supportsColor();
@@ -37,9 +46,7 @@ export function render(input, opts = {}) {
     branch:  (f.branch && input.branch)
       ? `${c(['bold', 'brightCyan'], `⎇ ${safe(input.branch)}`)}${input.dirty ? c('brightRed', '*') : ''}`
       : '',
-    model:   (f.model && input.modelName)
-      ? c(['bold', 'brightBlue'], `${safe(input.modelName)}${input.contextWindow ? ` (${safe(input.contextWindow)})` : ''}`)
-      : '',
+    model:   modelPart(input, input.contextWindow, f.model, c),
     ctx:     (f.ctx && input.ctxPct != null)
       ? c(ctxColour(input.ctxPct, t), `● ${formatPct(input.ctxPct)} ctx`)
       : '',
@@ -70,9 +77,7 @@ export function render(input, opts = {}) {
   const sep    = `  ${c('dim', '│')}  `;
 
   if (config.layout === 'single') {
-    const compactModel = (f.model && input.modelName)
-      ? c(['bold', 'brightBlue'], `${safe(input.modelName)}${input.contextShort ? ` (${safe(input.contextShort)})` : ''}`)
-      : '';
+    const compactModel = modelPart(input, input.contextShort, f.model, c);
     const compactLocStr = f.loc ? formatLoc(input.linesAdded, input.linesRemoved, { compact: true }) : '';
     const compactLoc = compactLocStr ? c('yellow', compactLocStr) : '';
     const items = [parts.project, parts.branch, compactModel, parts.ctx, parts.duration, parts.cost,
