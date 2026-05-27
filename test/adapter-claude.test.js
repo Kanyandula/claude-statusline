@@ -112,3 +112,28 @@ test('claudeAdapter: display_name with paren followed by closing context label s
   assert.equal(out.contextWindow, '1M context');
   assert.equal(out.contextShort, '1M');
 });
+
+test('claudeAdapter: display_name with leading/trailing whitespace is trimmed', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: '  Opus 4.7 (1M context)  ' } });
+  assert.equal(out.modelName, 'Opus 4.7');
+  assert.equal(out.contextWindow, '1M context');
+});
+
+test('claudeAdapter: display_name with extra whitespace inside parens is trimmed', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: 'Opus 4.7 (  1M context  )' } });
+  assert.equal(out.modelName, 'Opus 4.7');
+  assert.equal(out.contextWindow, '1M context');
+  assert.equal(out.contextShort, '1M');
+});
+
+test('claudeAdapter: whitespace-only display_name → treated as missing (falls back to model id)', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: '   ' } });
+  assert.equal(out.modelName, null);
+  assert.equal(out.contextWindow, null);
+  assert.equal(out.contextShort, null);
+});
+
+test('claudeAdapter: non-string display_name is treated as missing', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7', display_name: 42 } });
+  assert.equal(out.modelName, null);
+});

@@ -15,17 +15,21 @@ const PAREN_GRAMMAR = /^([^()]+?)\s*\(([^()]+)\)\s*$/;
 const CONTEXT_SUFFIX = /\s*context\s*$/i;
 
 function splitDisplayName(displayName, modelId) {
-  if (!displayName) return { base: null, long: null, short: null };
-  const m = displayName.match(PAREN_GRAMMAR);
+  if (typeof displayName !== 'string') return { base: null, long: null, short: null };
+  const trimmed = displayName.trim();
+  // Whitespace-only display_name → treat as missing.
+  if (!trimmed) return { base: null, long: null, short: null };
+  const m = trimmed.match(PAREN_GRAMMAR);
   if (m) {
-    const base = m[1];
-    const long = m[2];
+    const base = m[1].trim();
+    const long = m[2].trim();
     const short = long.replace(CONTEXT_SUFFIX, '');
     return { base, long, short };
   }
-  // Unparseable display_name — keep the raw string and fall back to model-id lookup.
+  // Unparseable display_name — keep the (trimmed) raw string as base and
+  // fall back to model-id lookup for labels.
   return {
-    base:  displayName,
+    base:  trimmed,
     long:  modelId ? contextWindowLabel(modelId) || null : null,
     short: modelId ? contextWindowShortLabel(modelId) || null : null,
   };
