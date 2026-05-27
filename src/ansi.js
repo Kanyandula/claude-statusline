@@ -26,15 +26,12 @@ export function stripControlChars(s) {
   return s.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 }
 
+// Standard colour-capability detection: NO_COLOR off, FORCE_COLOR on,
+// otherwise check stdout TTY. Deployment-specific overrides (e.g. "we are
+// piped to from a host that renders our ANSI") belong in the caller, not
+// here — keep this helper deployment-agnostic.
 export function supportsColor() {
   if (process.env.NO_COLOR) return false;
   if (process.env.FORCE_COLOR) return true;
-  // Statusline scripts are typically invoked with stdin piped from a host
-  // (Claude Code, shell prompt, IDE statusbar) that renders ANSI to a TTY,
-  // even though our own stdout is a pipe. Node sets process.stdin.isTTY to
-  // `undefined` when piped and `true` when interactive — so "not true" is
-  // the right check for the piped case.
-  if (process.stdin && process.stdin.isTTY !== true) return true;
-  // Direct invocation in a terminal — fall back to stdout TTY check.
   return process.stdout && process.stdout.isTTY === true;
 }

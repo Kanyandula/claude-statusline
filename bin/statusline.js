@@ -9,6 +9,18 @@ process.stdout.on('error', (err) => {
   if (err.code === 'EPIPE') process.exit(0);
 });
 
+// Decide whether to emit ANSI for this invocation.
+// Hosted statusline mode: when our stdin is piped (Node reports isTTY !== true),
+// a host like Claude Code is feeding us JSON and rendering our output on its
+// own TTY. Our own stdout is a pipe, so the standard stdout-TTY check would
+// disable colour. This binary knows it's a statusline script and overrides.
+function computeColour() {
+  if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR) return true;
+  if (process.stdin && process.stdin.isTTY !== true) return true;
+  return process.stdout && process.stdout.isTTY === true;
+}
+
 const userPath = process.env.CLAUDE_STATUSLINE_CONFIG
   || join(homedir(), '.claude', 'claude-statusline.json');
 
@@ -34,7 +46,8 @@ process.stdin.on('end', () => {
     } catch { /* ignore — pipeline will handle */ }
 
     const config = loadConfig({ userPath, projectPath, env: process.env });
-    process.stdout.write(renderFromStdin(raw, { config, gitFn: getGitInfo }));
+    const colour = computeColour();
+    process.stdout.write(renderFromStdin(raw, { config, gitFn: getGitInfo, colour }));
   } catch (e) {
     if (process.env.CLAUDE_STATUSLINE_DEBUG) process.stderr.write(`statusline error: ${e}\n`);
   }
