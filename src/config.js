@@ -71,6 +71,10 @@ function applyEnv(cfg, env) {
   return out;
 }
 
+export const KNOWN_FIELDS = Object.keys(DEFAULT_CONFIG.fields);
+export const LAYOUTS = ['single', 'two-line'];
+export const KNOWN_THRESHOLDS = Object.keys(DEFAULT_CONFIG.thresholds);
+
 export function loadConfig({ userPath, projectPath, env } = {}) {
   let cfg = {
     layout: DEFAULT_CONFIG.layout,
