@@ -1,3 +1,9 @@
+// SGR codes for ANSI styling. Supported `wrap()` keys:
+//   colours          red, green, yellow, blue, magenta, cyan, white
+//   bright colours   brightRed, brightGreen, brightYellow, brightBlue,
+//                    brightMagenta, brightCyan, brightWhite
+//   modifiers        bold, dim, reset
+// Unknown keys are silently ignored by wrap() (passthrough).
 const CODES = {
   red: 31, green: 32, yellow: 33, blue: 34, magenta: 35, cyan: 36, white: 37,
   brightRed: 91, brightGreen: 92, brightYellow: 93, brightBlue: 94,
@@ -5,9 +11,18 @@ const CODES = {
   dim: 2, bold: 1, reset: 0
 };
 
-// `style` accepts either a single key (e.g. 'cyan') or an array
-// (e.g. ['bold', 'cyan']) so callers can combine modifiers without
-// nesting wrap() — which would break early due to inner reset codes.
+/**
+ * Wrap text in an ANSI SGR escape sequence.
+ * @param {string | string[]} style  one CODES key (e.g. 'cyan') or an array
+ *                                   to combine modifiers (e.g. ['bold','cyan']).
+ *                                   Arrays compose into a single sequence
+ *                                   like `\x1b[1;36m…\x1b[0m` so nested
+ *                                   wrap() calls (which would terminate the
+ *                                   outer style early via the inner reset)
+ *                                   aren't needed.
+ * @param {string} text              the text to wrap
+ * @returns {string} the wrapped text, or `text` unchanged if no codes resolved
+ */
 export function wrap(style, text) {
   const styles = Array.isArray(style) ? style : [style];
   const codes = styles.map(s => CODES[s]).filter(c => c !== undefined);

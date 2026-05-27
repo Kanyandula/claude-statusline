@@ -3,6 +3,12 @@ export function formatCost(usd) {
   return `$${usd.toFixed(2)}`;
 }
 
+// Auto-scaling duration:
+//   < 60s     →  "Ns"      e.g. "7s"
+//   < 1h      →  "NmMs"    e.g. "5m23s"
+//   ≥ 1h     →  "NhMm"     e.g. "23h54m"  (seconds intentionally dropped at
+//                                          hour scale — not meaningful in
+//                                          a statusline)
 export function formatDuration(ms) {
   if (typeof ms !== 'number' || Number.isNaN(ms) || ms < 0) return '';
   const totalSeconds = Math.floor(ms / 1000);
