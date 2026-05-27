@@ -1,12 +1,18 @@
 const CODES = {
   red: 31, green: 32, yellow: 33, blue: 34, magenta: 35, cyan: 36, white: 37,
+  brightRed: 91, brightGreen: 92, brightYellow: 93, brightBlue: 94,
+  brightMagenta: 95, brightCyan: 96, brightWhite: 97,
   dim: 2, bold: 1, reset: 0
 };
 
-export function wrap(colour, text) {
-  const code = CODES[colour];
-  if (code === undefined) return text;
-  return `\x1b[${code}m${text}\x1b[0m`;
+// `style` accepts either a single key (e.g. 'cyan') or an array
+// (e.g. ['bold', 'cyan']) so callers can combine modifiers without
+// nesting wrap() — which would break early due to inner reset codes.
+export function wrap(style, text) {
+  const styles = Array.isArray(style) ? style : [style];
+  const codes = styles.map(s => CODES[s]).filter(c => c !== undefined);
+  if (codes.length === 0) return text;
+  return `\x1b[${codes.join(';')}m${text}\x1b[0m`;
 }
 
 export function supportsColor() {

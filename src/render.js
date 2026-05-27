@@ -30,12 +30,12 @@ export function render(input, opts = {}) {
   const t = config.thresholds;
 
   const parts = {
-    project: (f.project && input.projectName) ? c('bold', input.projectName) : '',
+    project: (f.project && input.projectName) ? c(['bold', 'brightMagenta'], input.projectName) : '',
     branch:  (f.branch && input.branch)
-      ? `${c('cyan', `⎇ ${input.branch}`)}${input.dirty ? c('red', '*') : ''}`
+      ? `${c(['bold', 'brightCyan'], `⎇ ${input.branch}`)}${input.dirty ? c('brightRed', '*') : ''}`
       : '',
     model:   (f.model && input.modelName)
-      ? c('magenta', `${input.modelName}${input.contextWindow ? ` (${input.contextWindow})` : ''}`)
+      ? c(['bold', 'brightBlue'], `${input.modelName}${input.contextWindow ? ` (${input.contextWindow})` : ''}`)
       : '',
     ctx:     (f.ctx && input.ctxPct != null)
       ? c(ctxColour(input.ctxPct, t), `● ${formatPct(input.ctxPct)} ctx`)
@@ -63,18 +63,23 @@ export function render(input, opts = {}) {
     outputStyle: (f.outputStyle && input.outputStyle) ? c('dim', `📐 ${input.outputStyle}`) : '',
   };
 
+  const bar    = c('dim', '▌');
+  const sep    = `  ${c('dim', '│')}  `;
+
   if (config.layout === 'single') {
     const compactModel = (f.model && input.modelName)
-      ? c('magenta', `${input.modelName}${input.contextShort ? ` (${input.contextShort})` : ''}`)
+      ? c(['bold', 'brightBlue'], `${input.modelName}${input.contextShort ? ` (${input.contextShort})` : ''}`)
       : '';
     const compactLocStr = f.loc ? formatLoc(input.linesAdded, input.linesRemoved, { compact: true }) : '';
     const compactLoc = compactLocStr ? c('dim', compactLocStr) : '';
-    return ['▌', parts.project, parts.branch, compactModel, parts.ctx, parts.duration, parts.cost,
-            compactLoc, parts.apiRatio, parts.outputStyle].filter(Boolean).join('  ');
+    const items = [parts.project, parts.branch, compactModel, parts.ctx, parts.duration, parts.cost,
+                   compactLoc, parts.apiRatio, parts.outputStyle].filter(Boolean);
+    return items.length ? `${bar}  ${items.join(sep)}` : bar;
   }
 
-  const line1 = ['▌', parts.project, parts.branch, parts.model].filter(Boolean).join('  ');
-  const line2 = ['  ', parts.ctx, parts.duration, parts.cost, parts.loc, parts.apiRatio, parts.outputStyle]
-    .filter(Boolean).join('  ');
-  return `${line1}\n${line2}`;
+  const line1Items = [parts.project, parts.branch, parts.model].filter(Boolean);
+  const line2Items = [parts.ctx, parts.duration, parts.cost, parts.loc, parts.apiRatio, parts.outputStyle].filter(Boolean);
+  const line1 = line1Items.length ? `${bar}  ${line1Items.join(sep)}` : bar;
+  const line2 = line2Items.length ? `  ${line2Items.join(sep)}` : '';
+  return line2 ? `${line1}\n${line2}` : line1;
 }
