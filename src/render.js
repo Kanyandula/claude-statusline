@@ -41,7 +41,7 @@ export function render(input, opts = {}) {
       ? c(ctxColour(input.ctxPct, t), `● ${formatPct(input.ctxPct)} ctx`)
       : '',
     duration: (f.duration && input.durationMs != null)
-      ? c('dim', `⏱ ${formatDuration(input.durationMs)}`)
+      ? c('yellow', `⏱ ${formatDuration(input.durationMs)}`)
       : '',
     cost: (() => {
       if (!f.cost) return '';
@@ -53,14 +53,14 @@ export function render(input, opts = {}) {
     loc: (() => {
       if (!f.loc) return '';
       const s = formatLoc(input.linesAdded, input.linesRemoved);
-      return s ? c('dim', s) : '';
+      return s ? c('yellow', s) : '';
     })(),
     apiRatio: (() => {
       if (!f.apiRatio) return '';
       const s = apiRatioStr(input);
-      return s ? c('dim', s) : '';
+      return s ? c('yellow', s) : '';
     })(),
-    outputStyle: (f.outputStyle && input.outputStyle) ? c('dim', `📐 ${input.outputStyle}`) : '',
+    outputStyle: (f.outputStyle && input.outputStyle) ? c('yellow', `📐 ${input.outputStyle}`) : '',
   };
 
   const bar    = c('dim', '▌');
@@ -71,7 +71,7 @@ export function render(input, opts = {}) {
       ? c(['bold', 'brightBlue'], `${input.modelName}${input.contextShort ? ` (${input.contextShort})` : ''}`)
       : '';
     const compactLocStr = f.loc ? formatLoc(input.linesAdded, input.linesRemoved, { compact: true }) : '';
-    const compactLoc = compactLocStr ? c('dim', compactLocStr) : '';
+    const compactLoc = compactLocStr ? c('yellow', compactLocStr) : '';
     const items = [parts.project, parts.branch, compactModel, parts.ctx, parts.duration, parts.cost,
                    compactLoc, parts.apiRatio, parts.outputStyle].filter(Boolean);
     return items.length ? `${bar}  ${items.join(sep)}` : bar;
