@@ -5,8 +5,7 @@
   "type": "module",
   "engines": { "node": ">=18" },
   "bin": {
-    "claude-statusline": "./bin/claude-statusline.js",
-    "claude-statusline-render": "./bin/statusline.js"
+    "claude-statusline": "./bin/statusline.js"
   },
   "scripts": {
     "test": "node --test"
