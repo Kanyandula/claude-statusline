@@ -63,3 +63,24 @@ test('claudeAdapter: contextShort null when no model id', () => {
   const out = claudeAdapter({});
   assert.equal(out.contextShort, null);
 });
+
+test('claudeAdapter: display_name with parens is split (no double-label)', () => {
+  const out = claudeAdapter({ model: { id: 'claude-opus-4-7[1m]', display_name: 'Opus 4.7 (1M context)' } });
+  assert.equal(out.modelName, 'Opus 4.7');
+  assert.equal(out.contextWindow, '1M context');
+  assert.equal(out.contextShort, '1M');
+});
+
+test('claudeAdapter: display_name without parens falls back to model-id lookup', () => {
+  const out = claudeAdapter({ model: { id: 'claude-haiku-4-5', display_name: 'Haiku 4.5' } });
+  assert.equal(out.modelName, 'Haiku 4.5');
+  assert.equal(out.contextWindow, '200K context');
+  assert.equal(out.contextShort, '200K');
+});
+
+test('claudeAdapter: display_name with parens but unknown short label still parses', () => {
+  const out = claudeAdapter({ model: { id: 'unknown', display_name: 'Future Model (500K context)' } });
+  assert.equal(out.modelName, 'Future Model');
+  assert.equal(out.contextWindow, '500K context');
+  assert.equal(out.contextShort, '500K');
+});
