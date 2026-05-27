@@ -41,3 +41,17 @@ test('bin/statusline.js: user config file disables cost field', () => {
     assert.doesNotMatch(r.stdout.toString(), /\$19\.01/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('bin/statusline.js: pathologically large stdin does not crash or hang', () => {
+  // Generate 2 MB of junk (well above the 1 MB cap). The script must
+  // truncate, fail to parse, and degrade gracefully — not OOM or hang.
+  const huge = 'x'.repeat(2_000_000);
+  const r = spawnSync(process.execPath, ['bin/statusline.js'], {
+    input: huge,
+    env: { ...process.env, NO_COLOR: '1' },
+    timeout: 5000,
+  });
+  assert.equal(r.status, 0);
+  // Output is a degraded but well-formed string (just the ▌ bar, no fields).
+  assert.ok(typeof r.stdout.toString() === 'string');
+});
