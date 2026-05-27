@@ -32,7 +32,7 @@ export function render(input, opts = {}) {
   const parts = {
     project: (f.project && input.projectName) ? c('bold', input.projectName) : '',
     branch:  (f.branch && input.branch)
-      ? c('cyan', `⎇ ${input.branch}${input.dirty ? c('red', '*') : ''}`)
+      ? `${c('cyan', `⎇ ${input.branch}`)}${input.dirty ? c('red', '*') : ''}`
       : '',
     model:   (f.model && input.modelName)
       ? c('magenta', `${input.modelName}${input.contextWindow ? ` (${input.contextWindow})` : ''}`)
@@ -55,7 +55,11 @@ export function render(input, opts = {}) {
       const s = formatLoc(input.linesAdded, input.linesRemoved);
       return s ? c('dim', s) : '';
     })(),
-    apiRatio:    f.apiRatio    ? c('dim', apiRatioStr(input)) : '',
+    apiRatio: (() => {
+      if (!f.apiRatio) return '';
+      const s = apiRatioStr(input);
+      return s ? c('dim', s) : '';
+    })(),
     outputStyle: (f.outputStyle && input.outputStyle) ? c('dim', `📐 ${input.outputStyle}`) : '',
   };
 

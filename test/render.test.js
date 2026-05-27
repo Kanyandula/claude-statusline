@@ -72,3 +72,19 @@ test('render: dirty branch gets * suffix', () => {
   const out = render(input, { colour: false, config: DEFAULT_CONFIG });
   assert.match(out, /main\*/);
 });
+
+test('render: disabling branch field via config hides ⎇ marker', () => {
+  const cfg = { ...DEFAULT_CONFIG, fields: { ...DEFAULT_CONFIG.fields, branch: false } };
+  const input = { ...claudeAdapter(sample), branch: 'main', dirty: true };
+  const out = render(input, { colour: false, config: cfg });
+  assert.doesNotMatch(out, /⎇/);
+});
+
+test('render: apiRatio with durationMs=0 produces no stray ANSI', () => {
+  const cfg = { ...DEFAULT_CONFIG, fields: { ...DEFAULT_CONFIG.fields, apiRatio: true } };
+  const input = { ...claudeAdapter(sample), durationMs: 0 };
+  const out = render(input, { colour: true, config: cfg });
+  assert.doesNotMatch(out, /🌐/);
+  // No empty-wrap ANSI artifact:
+  assert.doesNotMatch(out, /\x1b\[2m\x1b\[0m/);
+});
