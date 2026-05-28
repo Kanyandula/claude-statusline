@@ -3,9 +3,9 @@
 // `implemented: true` flag so the dispatcher routes through instead of stubbing.
 const COMMANDS = [
   { name: 'init',      desc: 'Wire claude-statusline into Claude Code',                    implemented: true },
-  { name: 'layout',    desc: 'Switch layout: single | two-line',                            implemented: false },
-  { name: 'enable',    desc: 'Turn on a field',                                              implemented: false },
-  { name: 'disable',   desc: 'Turn off a field',                                             implemented: false },
+  { name: 'layout',    desc: 'Switch layout: single | two-line',                            implemented: true },
+  { name: 'enable',    desc: 'Turn on a field',                                              implemented: true },
+  { name: 'disable',   desc: 'Turn off a field',                                             implemented: true },
   { name: 'set',       desc: 'Set a config key by dotted path',                              implemented: false },
   { name: 'get',       desc: 'Print effective config as JSON',                               implemented: false },
   { name: 'preview',   desc: 'Render the statusline once with sample data',                  implemented: false },
@@ -48,6 +48,10 @@ export async function runCli(argv) {
   if (cmd === 'init') {
     return (await import('./init.js')).run(argv.slice(1));
   }
+
+  if (cmd === 'layout')  return (await import('./layout.js')).run(argv.slice(1));
+  if (cmd === 'enable')  return (await import('./enable.js')).run(argv.slice(1), 'enable');
+  if (cmd === 'disable') return (await import('./enable.js')).run(argv.slice(1), 'disable');
 
   if (STUB_SUBCOMMANDS.has(cmd)) {
     process.stderr.write(`claude-statusline: '${cmd}' not implemented yet\n`);
