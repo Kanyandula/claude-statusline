@@ -177,3 +177,20 @@ test('get: flag arg rejected with exit 2', () => {
     assert.match(r.stderr.toString(), /takes no flags/);
   } finally { cleanup(); }
 });
+
+test('get: prototype-chain traversal is blocked', () => {
+  const { home, configPath, cleanup } = tmpHome();
+  try {
+    const r = cli(['get', '__proto__.toString'], { HOME: home, CLAUDE_STATUSLINE_CONFIG: configPath });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr.toString(), /not found/);
+  } finally { cleanup(); }
+});
+
+test('get: constructor traversal is blocked', () => {
+  const { home, configPath, cleanup } = tmpHome();
+  try {
+    const r = cli(['get', 'constructor.name'], { HOME: home, CLAUDE_STATUSLINE_CONFIG: configPath });
+    assert.equal(r.status, 1);
+  } finally { cleanup(); }
+});

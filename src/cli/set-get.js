@@ -51,19 +51,27 @@ function getKeyPath(obj, dotted) {
   let cur = obj;
   for (const k of dotted.split('.')) {
     if (cur == null || typeof cur !== 'object') return undefined;
-    cur = cur[k];
+    // Block prototype-chain traversal: `get __proto__.toString` would otherwise
+    // reach Object.prototype and surface built-ins as "config values".
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') return undefined;
+    cur = Object.prototype.hasOwnProperty.call(cur, k) ? cur[k] : undefined;
   }
   return cur;
 }
 
 export function runGet(argv) {
-  // `get` ignores --scope — it always prints the effective merged config.
-  // Single optional positional: the dotted path. No flags.
-  const positional = argv.find(a => !a.startsWith('--'));
-  if (argv.some(a => a.startsWith('--'))) {
+  const parsed = parseSubcommandArgs(argv, 'get');
+  if (parsed.error) { process.stderr.write(`${parsed.error}\n`); return parsed.code; }
+  // get doesn't accept --scope — the merged-config view is what we always print.
+  if (argv.some(a => a === '--scope' || a.startsWith('--scope='))) {
     process.stderr.write(`get: takes no flags; expected optional <key.path>\n`);
     return 2;
   }
+  if (parsed.positionals.length > 1) {
+    process.stderr.write(`get: expected at most one <key.path>\n`);
+    return 2;
+  }
+  const positional = parsed.positionals[0];
 
   const cfg = loadConfig({
     userPath: resolveUserConfigPath(),
@@ -71,7 +79,7 @@ export function runGet(argv) {
     env: process.env,
   });
 
-  if (positional) {
+  if (positional !== undefined) {
     const v = getKeyPath(cfg, positional);
     if (v === undefined) {
       process.stderr.write(`get: '${positional}' not found in effective config\n`);
