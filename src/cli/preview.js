@@ -6,14 +6,18 @@ import { renderFromStdin } from '../pipeline.js';
 import { loadConfig } from '../config.js';
 import { getGitInfo } from '../git.js';
 import { resolveUserConfigPath, resolveProjectConfigPath } from './paths.js';
+import { computeColour } from './colour.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLED_FIXTURE = join(__dirname, '..', '..', 'test', 'fixtures', 'stdin-sample.json');
-const LIVE_CAPTURE = '/tmp/claude-stdin.json';
+const LIVE_CAPTURE = process.env.CLAUDE_STATUSLINE_LIVE_PATH || '/tmp/claude-stdin.json';
 
 function readSampleJson(live) {
   if (live && existsSync(LIVE_CAPTURE)) return readFileSync(LIVE_CAPTURE, 'utf8');
-  if (live) process.stderr.write(`preview: no live capture at ${LIVE_CAPTURE} — falling back to bundled sample.\n`);
+  if (live) process.stderr.write(
+    `preview: no live capture at ${LIVE_CAPTURE} — falling back to bundled sample.\n` +
+    `        (to create one, wrap your statusLine command in 'tee ${LIVE_CAPTURE}' temporarily)\n`
+  );
   return readFileSync(BUNDLED_FIXTURE, 'utf8');
 }
 
@@ -36,7 +40,7 @@ export function run(argv) {
     projectPath: resolveProjectConfigPath(),
     env: process.env,
   });
-  process.stdout.write(renderFromStdin(raw, { config, gitFn: getGitInfo, colour: !process.env.NO_COLOR }));
+  process.stdout.write(renderFromStdin(raw, { config, gitFn: getGitInfo, colour: computeColour() }));
   process.stdout.write('\n');
   return 0;
 }

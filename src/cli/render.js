@@ -2,15 +2,9 @@ import { resolveUserConfigPath, resolveProjectConfigPath } from './paths.js';
 import { renderFromStdin } from '../pipeline.js';
 import { loadConfig } from '../config.js';
 import { getGitInfo } from '../git.js';
+import { computeColour } from './colour.js';
 
 const MAX_STDIN_BYTES = 1_000_000;
-
-function computeColour() {
-  if (process.env.NO_COLOR) return false;
-  if (process.env.FORCE_COLOR) return true;
-  if (process.stdin && process.stdin.isTTY !== true) return true;
-  return process.stdout && process.stdout.isTTY === true;
-}
 
 /** Drains stdin, renders, writes stdout. Returns a Promise that resolves
  *  once stdout is flushed — callers that need to sequence after rendering
