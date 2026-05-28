@@ -35,7 +35,7 @@ test('unknown command exits 64 with help', () => {
 });
 
 test('stub subcommands exit 1 with not-implemented message', () => {
-  for (const cmd of ['set', 'get', 'preview', 'reset', 'uninstall']) {
+  for (const cmd of ['preview', 'reset', 'uninstall']) {
     const r = cli([cmd]);
     assert.equal(r.status, 1, `expected status 1 for '${cmd}'`);
     assert.match(r.stderr.toString(), new RegExp(`'${cmd}' not implemented yet`));
