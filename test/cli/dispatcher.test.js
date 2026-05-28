@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
 function cli(args, opts = {}) {
-  return spawnSync(process.execPath, ['bin/claude-statusline.js', ...args], opts);
+  const env = opts.env || { ...process.env, CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' };
+  return spawnSync(process.execPath, ['bin/claude-statusline.js', ...args], { ...opts, env });
 }
 
 test('--help prints usage and exits 0', () => {
@@ -43,12 +44,12 @@ test('stub subcommands exit 1 with not-implemented message', () => {
 
 test('render subcommand pipes stdin through and emits output', () => {
   const sample = '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"cost":{"total_cost_usd":1.23,"total_duration_ms":60000}}';
-  const r = cli(['render'], { input: sample, env: { ...process.env, NO_COLOR: '1' } });
+  const r = cli(['render'], { input: sample, env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' } });
   assert.equal(r.status, 0);
   assert.match(r.stdout.toString(), /Opus 4\.7 \(1M context\)/);
 });
 
 test('render subcommand: empty stdin does not crash', () => {
-  const r = cli(['render'], { input: '', env: { ...process.env, NO_COLOR: '1' } });
+  const r = cli(['render'], { input: '', env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' } });
   assert.equal(r.status, 0);
 });

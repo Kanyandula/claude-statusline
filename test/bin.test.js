@@ -8,21 +8,21 @@ import { tmpdir } from 'node:os';
 const sample = readFileSync(new URL('./fixtures/stdin-sample.json', import.meta.url), 'utf8');
 
 test('bin/statusline.js: prints expected content', () => {
-  const r = spawnSync(process.execPath, ['bin/statusline.js'], { input: sample, env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, ['bin/statusline.js'], { input: sample, env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' } });
   assert.equal(r.status, 0);
   assert.match(r.stdout.toString(), /Opus 4\.7 \(1M context\)/);
   assert.match(r.stdout.toString(), /\$19\.01/);
 });
 
 test('bin/statusline.js: empty stdin does not crash', () => {
-  const r = spawnSync(process.execPath, ['bin/statusline.js'], { input: '', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, ['bin/statusline.js'], { input: '', env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' } });
   assert.equal(r.status, 0);
 });
 
 test('bin/statusline.js: respects CLAUDE_STATUSLINE_LAYOUT=single', () => {
   const r = spawnSync(process.execPath, ['bin/statusline.js'], {
     input: sample,
-    env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_LAYOUT: 'single' },
+    env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_LAYOUT: 'single', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' },
   });
   assert.equal(r.status, 0);
   assert.equal(r.stdout.toString().split('\n').length, 1);
@@ -48,7 +48,7 @@ test('bin/statusline.js: pathologically large stdin does not crash or hang', () 
   const huge = 'x'.repeat(2_000_000);
   const r = spawnSync(process.execPath, ['bin/statusline.js'], {
     input: huge,
-    env: { ...process.env, NO_COLOR: '1' },
+    env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' },
     timeout: 5000,
   });
   assert.equal(r.status, 0);

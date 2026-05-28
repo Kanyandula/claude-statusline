@@ -8,7 +8,7 @@ const sample = readFileSync(new URL('../fixtures/stdin-sample.json', import.meta
 test('bin/statusline.js shim still produces the expected output', () => {
   const r = spawnSync(process.execPath, ['bin/statusline.js'], {
     input: sample,
-    env: { ...process.env, NO_COLOR: '1' },
+    env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' },
   });
   assert.equal(r.status, 0);
   assert.match(r.stdout.toString(), /Opus 4\.7 \(1M context\)/);
@@ -18,7 +18,7 @@ test('bin/statusline.js shim still produces the expected output', () => {
 test('bin/statusline.js shim: empty stdin does not crash', () => {
   const r = spawnSync(process.execPath, ['bin/statusline.js'], {
     input: '',
-    env: { ...process.env, NO_COLOR: '1' },
+    env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' },
   });
   assert.equal(r.status, 0);
 });
