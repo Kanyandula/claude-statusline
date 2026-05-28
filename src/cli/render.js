@@ -26,20 +26,23 @@ export function runRender() {
     raw += d;
     if (raw.length > MAX_STDIN_BYTES) raw = raw.slice(0, MAX_STDIN_BYTES);
   });
-  process.stdin.on('end', () => {
-    try {
-      let projectPath = null;
+  return new Promise(resolve => {
+    process.stdin.on('end', () => {
       try {
-        const parsed = JSON.parse(raw || '{}');
-        const cwd = parsed?.workspace?.current_dir || parsed?.cwd;
-        if (cwd) projectPath = resolveProjectConfigPath(cwd);
-      } catch { /* projectPath stays null; pipeline parses independently */ }
+        let projectPath = null;
+        try {
+          const parsed = JSON.parse(raw || '{}');
+          const cwd = parsed?.workspace?.current_dir || parsed?.cwd;
+          if (cwd) projectPath = resolveProjectConfigPath(cwd);
+        } catch { /* projectPath stays null; pipeline parses independently */ }
 
-      const config = loadConfig({ userPath, projectPath, env: process.env });
-      const colour = computeColour();
-      process.stdout.write(renderFromStdin(raw, { config, gitFn: getGitInfo, colour }));
-    } catch (e) {
-      if (process.env.CLAUDE_STATUSLINE_DEBUG) process.stderr.write(`statusline error: ${e}\n`);
-    }
+        const config = loadConfig({ userPath, projectPath, env: process.env });
+        const colour = computeColour();
+        process.stdout.write(renderFromStdin(raw, { config, gitFn: getGitInfo, colour }));
+      } catch (e) {
+        if (process.env.CLAUDE_STATUSLINE_DEBUG) process.stderr.write(`statusline error: ${e}\n`);
+      }
+      resolve();
+    });
   });
 }
