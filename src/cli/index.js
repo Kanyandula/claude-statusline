@@ -9,8 +9,8 @@ const COMMANDS = [
   { name: 'set',       desc: 'Set a config key by dotted path',                              implemented: true },
   { name: 'get',       desc: 'Print effective config as JSON',                               implemented: true },
   { name: 'preview',   desc: 'Render the statusline once with sample data',                  implemented: true },
-  { name: 'reset',     desc: 'Restore defaults (deletes config file)',                       implemented: false },
-  { name: 'uninstall', desc: 'Remove statusLine from settings.json',                         implemented: false },
+  { name: 'reset',     desc: 'Restore defaults (deletes config file)',                       implemented: true },
+  { name: 'uninstall', desc: 'Remove statusLine from settings.json',                         implemented: true },
   { name: 'render',    desc: 'Render statusline from stdin (invoked by Claude Code each prompt)', implemented: true },
 ];
 
@@ -54,7 +54,9 @@ export async function runCli(argv) {
   if (cmd === 'disable') return (await import('./enable.js')).run(argv.slice(1), 'disable');
   if (cmd === 'set') return (await import('./set-get.js')).runSet(argv.slice(1));
   if (cmd === 'get') return (await import('./set-get.js')).runGet(argv.slice(1));
-  if (cmd === 'preview') return (await import('./preview.js')).run(argv.slice(1));
+  if (cmd === 'preview')   return (await import('./preview.js')).run(argv.slice(1));
+  if (cmd === 'reset')     return (await import('./reset.js')).run(argv.slice(1));
+  if (cmd === 'uninstall') return (await import('./uninstall.js')).run(argv.slice(1));
 
   if (STUB_SUBCOMMANDS.has(cmd)) {
     process.stderr.write(`claude-statusline: '${cmd}' not implemented yet\n`);
