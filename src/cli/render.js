@@ -1,5 +1,4 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { resolveUserConfigPath, resolveProjectConfigPath } from './paths.js';
 import { renderFromStdin } from '../pipeline.js';
 import { loadConfig } from '../config.js';
 import { getGitInfo } from '../git.js';
@@ -18,8 +17,7 @@ export function runRender() {
     if (err.code === 'EPIPE') process.exit(0);
   });
 
-  const userPath = process.env.CLAUDE_STATUSLINE_CONFIG
-    || join(homedir(), '.claude', 'claude-statusline.json');
+  const userPath = resolveUserConfigPath();
 
   let raw = '';
   process.stdin.setEncoding('utf8');
@@ -34,7 +32,7 @@ export function runRender() {
       try {
         const parsed = JSON.parse(raw || '{}');
         const cwd = parsed?.workspace?.current_dir || parsed?.cwd;
-        if (cwd) projectPath = join(cwd, '.claude', 'claude-statusline.json');
+        if (cwd) projectPath = resolveProjectConfigPath(cwd);
       } catch { /* projectPath stays null; pipeline parses independently */ }
 
       const config = loadConfig({ userPath, projectPath, env: process.env });
