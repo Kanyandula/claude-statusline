@@ -2,7 +2,7 @@
 // stub set. As real subcommands ship, their entries here gain an
 // `implemented: true` flag so the dispatcher routes through instead of stubbing.
 const COMMANDS = [
-  { name: 'init',      desc: 'Wire claude-statusline into Claude Code',                    implemented: false },
+  { name: 'init',      desc: 'Wire claude-statusline into Claude Code',                    implemented: true },
   { name: 'layout',    desc: 'Switch layout: single | two-line',                            implemented: false },
   { name: 'enable',    desc: 'Turn on a field',                                              implemented: false },
   { name: 'disable',   desc: 'Turn off a field',                                             implemented: false },
@@ -43,6 +43,10 @@ export async function runCli(argv) {
     const { runRender } = await import('./render.js');
     await runRender();
     return 0;
+  }
+
+  if (cmd === 'init') {
+    return (await import('./init.js')).run(argv.slice(1));
   }
 
   if (STUB_SUBCOMMANDS.has(cmd)) {
