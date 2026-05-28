@@ -1,17 +1,25 @@
-const HELP = `\
-claude-statusline <command> [options]
+// Command registry — single source of truth for the help text and the
+// stub set. As real subcommands ship, their entries here gain an
+// `implemented: true` flag so the dispatcher routes through instead of stubbing.
+const COMMANDS = [
+  { name: 'init',      desc: 'Wire claude-statusline into Claude Code',                    implemented: false },
+  { name: 'layout',    desc: 'Switch layout: single | two-line',                            implemented: false },
+  { name: 'enable',    desc: 'Turn on a field',                                              implemented: false },
+  { name: 'disable',   desc: 'Turn off a field',                                             implemented: false },
+  { name: 'set',       desc: 'Set a config key by dotted path',                              implemented: false },
+  { name: 'get',       desc: 'Print effective config as JSON',                               implemented: false },
+  { name: 'preview',   desc: 'Render the statusline once with sample data',                  implemented: false },
+  { name: 'reset',     desc: 'Restore defaults (deletes config file)',                       implemented: false },
+  { name: 'uninstall', desc: 'Remove statusLine from settings.json',                         implemented: false },
+  { name: 'render',    desc: 'Render statusline from stdin (invoked by Claude Code each prompt)', implemented: true },
+];
+
+function buildHelp() {
+  const rows = COMMANDS.map(c => `  ${c.name.padEnd(10)} ${c.desc}`).join('\n');
+  return `claude-statusline <command> [options]
 
 Commands:
-  init        Wire claude-statusline into Claude Code
-  layout      Switch layout: single | two-line
-  enable      Turn on a field
-  disable     Turn off a field
-  set         Set a config key by dotted path
-  get         Print effective config as JSON
-  preview     Render the statusline once with sample data
-  reset       Restore defaults (deletes config file)
-  uninstall   Remove statusLine from settings.json
-  render      Internal — invoked by Claude Code each prompt
+${rows}
   --help, -h  Print this help
 
 Global options:
@@ -19,8 +27,10 @@ Global options:
   --force                Overwrite an existing statusLine entry on init
   --keep-config          Keep claude-statusline.json when uninstalling
 `;
+}
 
-const STUB_SUBCOMMANDS = new Set(['init', 'layout', 'enable', 'disable', 'set', 'get', 'preview', 'reset', 'uninstall']);
+const HELP = buildHelp();
+const STUB_SUBCOMMANDS = new Set(COMMANDS.filter(c => !c.implemented).map(c => c.name));
 
 export async function runCli(argv) {
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {

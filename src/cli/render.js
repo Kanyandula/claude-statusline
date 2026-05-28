@@ -12,6 +12,9 @@ function computeColour() {
   return process.stdout && process.stdout.isTTY === true;
 }
 
+/** Drains stdin, renders, writes stdout. Returns a Promise that resolves
+ *  once stdout is flushed — callers that need to sequence after rendering
+ *  must await it; the bin/statusline.js shim deliberately doesn't. */
 export function runRender() {
   process.stdout.on('error', (err) => {
     if (err.code === 'EPIPE') process.exit(0);
