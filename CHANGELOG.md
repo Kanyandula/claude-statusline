@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] — Phase 5: distribution
+
+### Added
+- Published as `@kanyandula/claude-statusline` on npm
+- GitHub repository at https://github.com/Kanyandula/claude-statusline
+- GitHub Actions CI (Linux + macOS × Node 18/20/22)
+- Issue + PR templates
+- `install.sh` curl-install fallback for environments without npm
+- Real LICENSE copyright (Ephraim Kanyandula)
+- `CONTRIBUTING.md`
+
+### Changed
+- `package.json` bumped to v1.0.0; added `repository`, `homepage`, `bugs`, `author`, `publishConfig`
+- npm bundle scope tightened: `docs/superpowers/` excluded via `.npmignore` + explicit `files` array
+- `dispatcher.test.js` uses absolute path via `import.meta.url` (was relative)
+
 ## [0.4.0] — Phase 4: docs + tests polish
 
 ### Added
