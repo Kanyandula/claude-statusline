@@ -83,9 +83,10 @@ test('getGitInfo: repo with hooksPath-defined post-index-change hook is not exec
   const hookFile  = join(hookDir, 'post-index-change');
   writeFileSync(hookFile, `#!/bin/sh\ntouch "${sentinel}"\n`);
   chmodSync(hookFile, 0o755);
-  // Touch a file then run status to invite post-index-change to fire.
+  // Write an untracked file — git status will see it as dirty without
+  // us needing to run git add (which would trigger post-index-change itself).
   writeFileSync(join(dir, 'b.txt'), 'new');
-  run(['add', '.']);
+  spawnSync('git', ['-c', 'core.hooksPath=/dev/null', 'add', '.'], { cwd: dir });
   try {
     getGitInfo(dir);
     assert.equal(existsSync(sentinel), false,
