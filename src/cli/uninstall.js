@@ -1,19 +1,31 @@
-import { parseArgs } from 'node:util';
 import { resolveSettingsPath, resolveUserConfigPath } from './paths.js';
 import { removeStatusLine } from './settings.js';
 import { deleteConfigFile } from './config-file.js';
 import { existsSync } from 'node:fs';
+import { parseSubcommandArgs } from './parse-args.js';
+
+const USAGE = `claude-statusline uninstall [--keep-config]
+
+Remove the statusLine entry from ~/.claude/settings.json. Unless
+--keep-config is set, also delete ~/.claude/claude-statusline.json.
+Project-level configs are not touched.
+
+Options:
+  --keep-config          Preserve ~/.claude/claude-statusline.json
+  --help, -h             Print this help
+`;
 
 export function run(argv) {
-  let parsed;
-  try {
-    parsed = parseArgs({
-      args: argv,
-      options: { 'keep-config': { type: 'boolean', default: false } },
-      allowPositionals: false,
-    });
-  } catch (e) {
-    process.stderr.write(`uninstall: ${e.message}\n`);
+  const parsed = parseSubcommandArgs(
+    argv, 'uninstall', { 'keep-config': { type: 'boolean', default: false } }, USAGE, { includeScope: false }
+  );
+  if (parsed.handled) return parsed.code;
+  if (parsed.error) {
+    process.stderr.write(`${parsed.error}\n`);
+    return parsed.code;
+  }
+  if (parsed.positionals.length > 0) {
+    process.stderr.write(`uninstall: unexpected positional argument '${parsed.positionals[0]}'\n`);
     return 2;
   }
   const keepConfig = parsed.values['keep-config'];

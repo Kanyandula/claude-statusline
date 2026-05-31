@@ -174,7 +174,8 @@ test('get: flag arg rejected with exit 2', () => {
   try {
     const r = cli(['get', '--scope=user'], { HOME: home });
     assert.equal(r.status, 2);
-    assert.match(r.stderr.toString(), /takes no flags/);
+    // --scope is rejected because get uses includeScope: false
+    assert.match(r.stderr.toString(), /get:/);
   } finally { cleanup(); }
 });
 

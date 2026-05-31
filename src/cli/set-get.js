@@ -3,6 +3,42 @@ import { configPathForScope, resolveUserConfigPath, resolveProjectConfigPath } f
 import { readConfigFile, writeConfigFile, setKeyPath, coerceValue } from './config-file.js';
 import { parseSubcommandArgs } from './parse-args.js';
 
+const SET_USAGE = `claude-statusline set <key.path> <value> [--scope=user|project]
+
+Set a config key by dotted path. Type is coerced from the value string.
+
+Allowed key paths:
+  layout                    one of: single, two-line
+  fields.<name>             boolean — name in: project, branch, model, ctx,
+                            duration, cost, loc, apiRatio, outputStyle
+  thresholds.<name>         number — name in: ctxWarnPct, ctxDangerPct,
+                            costWarnUsd, costDangerUsd
+
+Examples:
+  claude-statusline set layout single
+  claude-statusline set fields.cost false
+  claude-statusline set thresholds.costWarnUsd 3
+
+Options:
+  --scope=user|project   Which config file to write (default: user)
+  --help, -h             Print this help
+`;
+
+const GET_USAGE = `claude-statusline get [key.path]
+
+Print the effective config (merged from user file + project file + env vars)
+as pretty JSON. With a key path, prints just that value.
+
+Examples:
+  claude-statusline get
+  claude-statusline get layout
+  claude-statusline get fields.cost
+  claude-statusline get thresholds.costWarnUsd
+
+Options:
+  --help, -h             Print this help
+`;
+
 /** Validates a dotted path against the schema. Returns null if OK, or an error message. */
 function validateKeyPath(dotted, value) {
   if (dotted === 'layout') {
@@ -26,7 +62,8 @@ function validateKeyPath(dotted, value) {
 }
 
 export function runSet(argv) {
-  const parsed = parseSubcommandArgs(argv, 'set');
+  const parsed = parseSubcommandArgs(argv, 'set', {}, SET_USAGE);
+  if (parsed.handled) return parsed.code;
   if (parsed.error) { process.stderr.write(`${parsed.error}\n`); return parsed.code; }
   const { scope } = parsed.values;
   if (parsed.positionals.length !== 2) {
@@ -60,13 +97,9 @@ function getKeyPath(obj, dotted) {
 }
 
 export function runGet(argv) {
-  const parsed = parseSubcommandArgs(argv, 'get');
+  const parsed = parseSubcommandArgs(argv, 'get', {}, GET_USAGE, { includeScope: false });
+  if (parsed.handled) return parsed.code;
   if (parsed.error) { process.stderr.write(`${parsed.error}\n`); return parsed.code; }
-  // get doesn't accept --scope — the merged-config view is what we always print.
-  if (argv.some(a => a === '--scope' || a.startsWith('--scope='))) {
-    process.stderr.write(`get: takes no flags; expected optional <key.path>\n`);
-    return 2;
-  }
   if (parsed.positionals.length > 1) {
     process.stderr.write(`get: expected at most one <key.path>\n`);
     return 2;
