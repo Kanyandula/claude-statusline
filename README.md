@@ -20,21 +20,26 @@ installs in under a minute.
 ## Install
 
 ```bash
-npm i -g claude-statusline
+npm i -g @kanyandula/claude-statusline
 ```
 
-> **Note:** A curl-install fallback (for locked-down environments without npm
-> global access) is planned for Phase 5. Until then, npm is the supported path.
+**Without npm (locked-down environments)**
 
-> `LICENSE` and `repository` URLs in `package.json` are placeholders until
-> Phase 5 publishes the canonical GitHub repo.
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kanyandula/claude-statusline/main/install.sh | sh
+```
+
+This installs only the renderer — you won't get the `claude-statusline` CLI.
+Customise by editing `~/.claude/claude-statusline.json` directly using the
+[CONFIG reference](docs/CONFIG.md). Switch to `npm i -g @kanyandula/claude-statusline`
+later if npm becomes available.
 
 ---
 
 ## Quick start
 
 ```bash
-npm i -g claude-statusline
+npm i -g @kanyandula/claude-statusline
 claude-statusline init
 # restart Claude Code — the statusline appears automatically
 ```
