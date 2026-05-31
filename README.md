@@ -56,7 +56,7 @@ Two layouts are available. The default is `two-line`.
 ### `single`
 
 ```
-▌  myproject  │  ⎇ main*  │  Sonnet 4.5 200K  │  ●12%  │  ⏱1h03m  │  $0.42  │  +104/-18
+▌  myproject  │  ⎇ main*  │  Sonnet 4.5 (200K)  │  ●12%  │  ⏱1h03m  │  $0.42  │  +104/-18
 ```
 
 `single` is more compact: it drops " context" from the model label and uses
@@ -244,7 +244,7 @@ claude-statusline enable apiRatio
 Appears as:
 
 ```
-🌐 38% api
+🌐 38%
 ```
 
 ### `outputStyle`

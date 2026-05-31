@@ -3,7 +3,7 @@
 Recipe gallery for common `claude-statusline` setups. Each recipe shows the
 CLI commands and/or JSON config needed, plus a sample of what the statusline
 looks like. Commands without `--scope` write to the user-level config
-(`~/.config/claude-statusline/config.json`).
+(`~/.claude/claude-statusline.json`).
 
 ---
 
@@ -20,7 +20,7 @@ claude-statusline disable duration
 ```
 
 The same result expressed as JSON (write to
-`~/.config/claude-statusline/config.json`):
+`~/.claude/claude-statusline.json`):
 
 ```json
 {
@@ -61,10 +61,10 @@ Sample output (two-line layout, default):
 
 ```
 ▌ myproject  main  Claude Code 1.2.3
-  Opus 4.7 (1M) │ ● 72% ctx │ $4.32 │ 23m14s │ 📊 0.42 ratio │ 📝 normal
+  Opus 4.7 (1M) │ ● 72% ctx │ $4.32 │ 23m14s │ 🌐 42% │ 📐 normal
 ```
 
-`📊 0.42 ratio` is the API ratio field; `📝 normal` is the output style. Both
+`🌐 42%` is the API ratio field; `📐 normal` is the output style. Both
 are appended after the core fields in the order they appear in `KNOWN_FIELDS`.
 
 ---
@@ -113,11 +113,15 @@ claude-statusline disable loc --scope=project
 Claude Code is open in that directory, the project config is layered on top
 of your user config; all other projects are unaffected.
 
-You can confirm what file was written:
+You can confirm the effective values (user + project merged) by `cd`-ing into
+the project directory first:
 
 ```bash
-claude-statusline get --scope=project
+cd ~/projects/narrow-terminal
+claude-statusline get   # merges user + project config; shows effective values
 ```
+
+`get` always prints the merged view — there is no `--scope` flag on `get`.
 
 To revert the project override only:
 
@@ -290,10 +294,10 @@ Sample output at $11 into a session:
 
 ```
 ▌ myproject  main  Claude Code 1.2.3
-  Opus 4.7 (1M) │ ● 55% ctx │ $11.20 │ 41m03s │ 📊 0.61 ratio
+  Opus 4.7 (1M) │ ● 55% ctx │ $11.20 │ 41m03s │ 🌐 61%
 ```
 
 The `$11.20` renders in **red** (past the $10 danger threshold). The
-`📊 0.61 ratio` shows that 61 % of tokens are output tokens — a useful signal
-when debugging why a session is expensive. This combination is particularly
+`🌐 61%` shows that 61% of wall time was spent waiting on the API — a useful
+signal when debugging why a session is expensive. This combination is particularly
 useful for tracking personal Claude API spend across long research sessions.

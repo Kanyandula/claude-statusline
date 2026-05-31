@@ -209,14 +209,14 @@ What the CLI accepts and rejects:
 - In a config file: unrecognised values are silently ignored; the default
   `"two-line"` applies.
 - Via `CLAUDE_STATUSLINE_LAYOUT` env var: same — unrecognised values ignored.
-- Via `config set layout <value>`: the CLI rejects unknown values with an
-  error message listing valid options.
+- Via `claude-statusline set layout <value>`: the CLI rejects unknown values
+  with an error message listing valid options.
 
 ### `fields.<name>`
 
 - Must be one of the 9 known field names (`project`, `branch`, `model`, `ctx`,
   `duration`, `cost`, `loc`, `apiRatio`, `outputStyle`).
-- `config enable <name>` and `config disable <name>` reject unknown field names
+- `claude-statusline enable <name>` and `claude-statusline disable <name>` reject unknown field names
   with an error.
 - In a config file: unknown field names are silently ignored (forward-compat).
 - `CLAUDE_STATUSLINE_FIELDS`: unknown names in the comma-separated list are
@@ -225,7 +225,7 @@ What the CLI accepts and rejects:
 ### `thresholds.<name>`
 
 - Must be a number (integer or float).
-- `config set thresholds.<name> <value>`: rejects non-numeric strings with an
+- `claude-statusline set thresholds.<name> <value>`: rejects non-numeric strings with an
   error.
 - In a config file: non-numeric values are silently ignored; the built-in
   default for that threshold applies.

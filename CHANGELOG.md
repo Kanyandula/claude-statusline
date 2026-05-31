@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — Phase 4: docs + tests polish
+
 ### Added
-- (Phase 4 in progress — per-subcommand --help, README, docs/CONFIG.md,
-  docs/EXAMPLES.md, snapshot tests for renderer output, CHANGELOG)
+- Per-subcommand `--help` text for all 9 user-facing subcommands
+- `docs/CONFIG.md` — full configuration reference
+- `docs/EXAMPLES.md` — recipe gallery for common setups
+- Snapshot tests for renderer output
 
 ### Changed
 - Top-level `--help` text now shows per-command flags in brackets and scopes
