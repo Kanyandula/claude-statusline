@@ -1,10 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BIN = resolve(__dirname, '../../bin/claude-statusline.js');
 
 function cli(args, opts = {}) {
   const env = opts.env || { ...process.env, CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' };
-  return spawnSync(process.execPath, ['bin/claude-statusline.js', ...args], { ...opts, env });
+  return spawnSync(process.execPath, [BIN, ...args], { ...opts, env });
 }
 
 test('--help prints usage and exits 0', () => {
