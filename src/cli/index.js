@@ -2,20 +2,23 @@
 // stub set. As real subcommands ship, their entries here gain an
 // `implemented: true` flag so the dispatcher routes through instead of stubbing.
 const COMMANDS = [
-  { name: 'init',      desc: 'Wire claude-statusline into Claude Code',                    implemented: true },
-  { name: 'layout',    desc: 'Switch layout: single | two-line',                            implemented: true },
-  { name: 'enable',    desc: 'Turn on a field',                                              implemented: true },
-  { name: 'disable',   desc: 'Turn off a field',                                             implemented: true },
-  { name: 'set',       desc: 'Set a config key by dotted path',                              implemented: true },
-  { name: 'get',       desc: 'Print effective config as JSON',                               implemented: true },
-  { name: 'preview',   desc: 'Render the statusline once with sample data',                  implemented: true },
-  { name: 'reset',     desc: 'Restore defaults (deletes config file)',                       implemented: true },
-  { name: 'uninstall', desc: 'Remove statusLine from settings.json',                         implemented: true },
-  { name: 'render',    desc: 'Render statusline from stdin (invoked by Claude Code each prompt)', implemented: true },
+  { name: 'init',      desc: 'Wire claude-statusline into Claude Code',                              flags: ['--force'],        implemented: true },
+  { name: 'layout',    desc: 'Switch layout: single | two-line',                                      flags: [],                 implemented: true },
+  { name: 'enable',    desc: 'Turn on a field',                                                       flags: [],                 implemented: true },
+  { name: 'disable',   desc: 'Turn off a field',                                                      flags: [],                 implemented: true },
+  { name: 'set',       desc: 'Set a config key by dotted path',                                       flags: [],                 implemented: true },
+  { name: 'get',       desc: 'Print effective config as JSON',                                        flags: [],                 implemented: true },
+  { name: 'preview',   desc: 'Render the statusline once with sample data',                          flags: ['--live'],         implemented: true },
+  { name: 'reset',     desc: 'Restore defaults (deletes config file)',                                flags: [],                 implemented: true },
+  { name: 'uninstall', desc: 'Remove statusLine from settings.json',                                  flags: ['--keep-config'],  implemented: true },
+  { name: 'render',    desc: 'Render statusline from stdin (invoked by Claude Code each prompt)',     flags: [],                 implemented: true },
 ];
 
 function buildHelp() {
-  const rows = COMMANDS.map(c => `  ${c.name.padEnd(10)} ${c.desc}`).join('\n');
+  const rows = COMMANDS.map(c => {
+    const flagSuffix = c.flags.length ? `   [${c.flags.join(' ')}]` : '';
+    return `  ${c.name.padEnd(10)} ${c.desc}${flagSuffix}`;
+  }).join('\n');
   return `claude-statusline <command> [options]
 
 Commands:
@@ -23,9 +26,9 @@ ${rows}
   --help, -h  Print this help
 
 Global options:
-  --scope=user|project   Which file to read/write (default: user)
-  --force                Overwrite an existing statusLine entry on init
-  --keep-config          Keep claude-statusline.json when uninstalling
+  --scope=user|project   Which file to read/write (default: user; applies to
+                         init, layout, enable, disable, set, reset)
+  --help, -h             Print command-specific help (try: claude-statusline <cmd> --help)
 `;
 }
 

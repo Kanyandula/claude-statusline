@@ -34,13 +34,10 @@ test('unknown command exits 64 with help', () => {
   assert.match(r.stderr.toString(), /Commands:/);
 });
 
-test('stub subcommands exit 1 with not-implemented message', () => {
-  for (const cmd of []) {
-    const r = cli([cmd]);
-    assert.equal(r.status, 1, `expected status 1 for '${cmd}'`);
-    assert.match(r.stderr.toString(), new RegExp(`'${cmd}' not implemented yet`));
-  }
-});
+// NOTE: The STUB_SUBCOMMANDS stub mechanism in src/cli/index.js is retained
+// as the extension point for Phase 5+ subcommand additions. When a new
+// command is added with implemented:false, add a test here looping over its
+// names to verify the stub path.
 
 test('render subcommand pipes stdin through and emits output', () => {
   const sample = '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"cost":{"total_cost_usd":1.23,"total_duration_ms":60000}}';
