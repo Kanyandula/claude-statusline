@@ -1,17 +1,15 @@
 {
   "name": "claude-statusline",
-  "version": "0.3.0",
-  "description": "A configurable statusline for Claude Code.",
+  "version": "0.4.0",
+  "description": "A configurable statusline for Claude Code with init/preview/uninstall CLI.",
   "type": "module",
   "engines": { "node": ">=18" },
   "bin": {
     "claude-statusline": "./bin/claude-statusline.js",
     "claude-statusline-render": "./bin/statusline.js"
   },
-  "scripts": {
-    "test": "node --test"
-  },
-  "files": ["bin/", "src/", "test/fixtures/"],
-  "keywords": ["claude", "claude-code", "statusline", "cli", "ansi"],
+  "scripts": { "test": "node --test" },
+  "files": ["bin/", "src/", "test/fixtures/", "README.md", "CHANGELOG.md", "docs/", "LICENSE"],
+  "keywords": ["claude", "claude-code", "statusline", "cli", "ansi", "prompt"],
   "license": "MIT"
 }
