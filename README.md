@@ -1,5 +1,7 @@
 # claude-statusline
 
+[![CI](https://github.com/Kanyandula/claude-statusline/actions/workflows/ci.yml/badge.svg)](https://github.com/Kanyandula/claude-statusline/actions/workflows/ci.yml)
+
 ## What it is
 
 A configurable statusline for Claude Code that surfaces the information you
