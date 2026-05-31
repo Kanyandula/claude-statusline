@@ -9,7 +9,17 @@
     "claude-statusline-render": "./bin/statusline.js"
   },
   "scripts": { "test": "node --test" },
-  "files": ["bin/", "src/", "test/fixtures/", "README.md", "CHANGELOG.md", "docs/", "LICENSE"],
+  "files": [
+    "bin/",
+    "src/",
+    "test/fixtures/",
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "docs/CONFIG.md",
+    "docs/EXAMPLES.md"
+  ],
   "keywords": ["claude", "claude-code", "statusline", "cli", "ansi", "prompt"],
   "license": "MIT"
 }

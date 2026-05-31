@@ -1,0 +1,12 @@
+# Development plans + internal docs
+docs/superpowers/
+
+# Git + dev tooling
+.git/
+.github/
+.gitignore
+.npmignore
+
+# Test artefacts that aren't fixtures
+test/cli/
+test/*.test.js
