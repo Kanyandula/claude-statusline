@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Kanyandula/claude-statusline/actions/workflows/ci.yml/badge.svg)](https://github.com/Kanyandula/claude-statusline/actions/workflows/ci.yml)
 
+**Current release:** [v1.0.0](https://github.com/Kanyandula/claude-statusline/releases/tag/v1.0.0) — see [CHANGELOG](CHANGELOG.md)
+
 ## What it is
 
 A configurable statusline for Claude Code that surfaces the information you
