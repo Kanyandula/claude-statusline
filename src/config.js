@@ -20,7 +20,7 @@ export const DEFAULT_CONFIG = {
 //   - string path
 //   - absolute (no relative-path surprises from cwd-switching)
 //   - .json extension (narrows the surface to files explicitly typed as config)
-function isAllowedConfigPath(p) {
+export function isAllowedConfigPath(p) {
   return typeof p === 'string' && p.length > 0 && isAbsolute(p) && /\.json$/i.test(p);
 }
 
