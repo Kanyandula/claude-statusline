@@ -9,9 +9,9 @@ looks like. Commands without `--scope` write to the user-level config
 
 ### 1. Just the basics
 
-For users who only want model, context window, context percentage, and cost
-visible — nothing else. Strips out the loc counter and session duration so the
-bar stays short even in long sessions.
+For users who want a short bar focused on model, context window, context
+percentage, and cost. Strips out the LOC counter and session duration so the
+bar stays short even in long sessions; project and branch still show.
 
 ```bash
 claude-statusline layout single
@@ -38,8 +38,8 @@ Sample output:
 ▌  myproject  │  ⎇ main  │  Opus 4.7 (1M)  │  ● 15% ctx  │  $19.01
 ```
 
-All four core fields are present; the bar never grows with LOC or duration
-noise.
+Model, context, and cost stay visible alongside project and branch; the bar
+never grows with LOC or duration noise.
 
 ---
 

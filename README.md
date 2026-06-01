@@ -321,14 +321,14 @@ Work through this checklist in order:
    If the block is missing, re-run `claude-statusline init`.
 
 5. **Run with debug output.** Set `CLAUDE_STATUSLINE_DEBUG=1` before
-   launching Claude Code — errors from the render script will appear on
+   launching Claude Code — errors from the renderer will appear on
    stderr in the terminal where you started Claude Code.
 
    ```bash
    CLAUDE_STATUSLINE_DEBUG=1 claude
    ```
 
-6. **Inspect captured stdin.** If the script runs but the output looks wrong,
+6. **Inspect captured stdin.** If the renderer runs but the output looks wrong,
    temporarily wrap the command in `settings.json` with `tee` to capture
    exactly what Claude Code is sending:
 

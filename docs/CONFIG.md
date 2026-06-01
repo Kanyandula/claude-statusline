@@ -72,7 +72,7 @@ Controls how many output rows are rendered.
 | Layout | What it looks like |
 |---|---|
 | `two-line` | Two rows: identity row (project / branch / model) above metrics row (ctx / duration / cost / LOC) |
-| `single` | One row, compact — context shown as `1M` label, `+N/-M` LOC with no spaces, all fields on one line |
+| `single` | One row, compact — model label drops `" context"` (e.g. `1M` not `1M context`), `+N/-M` LOC with no spaces, all fields on one line |
 
 Any other value is silently ignored and the default `"two-line"` is used when
 read from a config file. Setting it via `CLAUDE_STATUSLINE_LAYOUT` to an

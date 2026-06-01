@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Preview sample moved from `test/fixtures/` to `src/fixtures/`; no `test/` files ship in the npm bundle
 
 ### Security
-- Config write/delete paths now honour the same absolute-`.json` allowlist as reads: `set`, `reset`, and `uninstall` refuse a `CLAUDE_STATUSLINE_CONFIG` that points outside an absolute `.json` path
+- Config write/delete paths now honour the same absolute-`.json` allowlist as reads: `set`, `reset`, and `uninstall` refuse a `CLAUDE_STATUSLINE_CONFIG` that is not an absolute `.json` path
 
 ## [0.4.0] — Phase 4: docs + tests polish
 
