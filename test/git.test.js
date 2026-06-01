@@ -36,6 +36,25 @@ test('getGitInfo: dirty working tree returns dirty=true', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('getGitInfo: detached HEAD reports (detached), dirty still tracked', () => {
+  const { dir, run } = makeRepo();
+  try {
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    run(['checkout', '-q', head]); // detach
+    const info = getGitInfo(dir);
+    assert.equal(info.branch, '(detached)');
+    assert.equal(info.dirty, false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('getGitInfo: untracked file makes the tree dirty', () => {
+  const { dir } = makeRepo();
+  try {
+    writeFileSync(join(dir, 'untracked.txt'), 'new');
+    assert.equal(getGitInfo(dir).dirty, true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('getGitInfo: non-git directory returns null', () => {
   const dir = mkdtempSync(join(tmpdir(), 'csnogit-'));
   try {
@@ -49,9 +68,10 @@ test('getGitInfo: missing cwd returns null', () => {
 });
 
 test('getGitInfo: git binary failure → null (not silent dirty=false)', () => {
-  // Simulate by passing an existing dir that is NOT a git repo — the
-  // is-inside-work-tree check fails first, so we get null. This guards
-  // against any future refactor that lets a partial git failure leak through.
+  // Simulate by passing an existing dir that is NOT a git repo — `git status`
+  // exits non-zero outside a work tree, so gitCmd returns null and we get null.
+  // This guards against any future refactor that lets a partial git failure
+  // leak through as a silent dirty=false.
   const dir = mkdtempSync(join(tmpdir(), 'csgit-partial-'));
   try {
     assert.equal(getGitInfo(dir), null);

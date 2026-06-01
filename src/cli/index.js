@@ -42,30 +42,35 @@ export async function runCli(argv) {
   }
   const cmd = argv[0];
 
-  if (cmd === 'render') {
-    const { runRender } = await import('./render.js');
-    await runRender();
-    return 0;
-  }
+  try {
+    if (cmd === 'render') {
+      const { runRender } = await import('./render.js');
+      await runRender();
+      return 0;
+    }
 
-  if (cmd === 'init') {
-    return (await import('./init.js')).run(argv.slice(1));
-  }
+    if (cmd === 'init') {
+      return (await import('./init.js')).run(argv.slice(1));
+    }
 
-  if (cmd === 'layout')  return (await import('./layout.js')).run(argv.slice(1));
-  if (cmd === 'enable')  return (await import('./enable.js')).run(argv.slice(1), 'enable');
-  if (cmd === 'disable') return (await import('./enable.js')).run(argv.slice(1), 'disable');
-  if (cmd === 'set') return (await import('./set-get.js')).runSet(argv.slice(1));
-  if (cmd === 'get') return (await import('./set-get.js')).runGet(argv.slice(1));
-  if (cmd === 'preview')   return (await import('./preview.js')).run(argv.slice(1));
-  if (cmd === 'reset')     return (await import('./reset.js')).run(argv.slice(1));
-  if (cmd === 'uninstall') return (await import('./uninstall.js')).run(argv.slice(1));
+    if (cmd === 'layout')  return (await import('./layout.js')).run(argv.slice(1));
+    if (cmd === 'enable')  return (await import('./enable.js')).run(argv.slice(1), 'enable');
+    if (cmd === 'disable') return (await import('./enable.js')).run(argv.slice(1), 'disable');
+    if (cmd === 'set') return (await import('./set-get.js')).runSet(argv.slice(1));
+    if (cmd === 'get') return (await import('./set-get.js')).runGet(argv.slice(1));
+    if (cmd === 'preview')   return (await import('./preview.js')).run(argv.slice(1));
+    if (cmd === 'reset')     return (await import('./reset.js')).run(argv.slice(1));
+    if (cmd === 'uninstall') return (await import('./uninstall.js')).run(argv.slice(1));
 
-  if (STUB_SUBCOMMANDS.has(cmd)) {
-    process.stderr.write(`claude-statusline: '${cmd}' not implemented yet\n`);
+    if (STUB_SUBCOMMANDS.has(cmd)) {
+      process.stderr.write(`claude-statusline: '${cmd}' not implemented yet\n`);
+      return 1;
+    }
+
+    process.stderr.write(`claude-statusline: unknown command '${cmd}'\n${HELP}`);
+    return 64;
+  } catch (e) {
+    process.stderr.write(`claude-statusline: ${e.message}\n`);
     return 1;
   }
-
-  process.stderr.write(`claude-statusline: unknown command '${cmd}'\n${HELP}`);
-  return 64;
 }

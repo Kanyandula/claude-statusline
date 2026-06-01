@@ -20,7 +20,7 @@ export const DEFAULT_CONFIG = {
 //   - string path
 //   - absolute (no relative-path surprises from cwd-switching)
 //   - .json extension (narrows the surface to files explicitly typed as config)
-function isAllowedConfigPath(p) {
+export function isAllowedConfigPath(p) {
   return typeof p === 'string' && p.length > 0 && isAbsolute(p) && /\.json$/i.test(p);
 }
 
@@ -75,6 +75,37 @@ export const KNOWN_FIELDS = Object.keys(DEFAULT_CONFIG.fields);
 export const LAYOUTS = ['single', 'two-line'];
 export const KNOWN_THRESHOLDS = Object.keys(DEFAULT_CONFIG.thresholds);
 
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+// Clamp a merged config to the known schema before it reaches the renderer.
+// Hand-edited config files bypass the `set` command's validation, so shapes
+// like {"fields": null} (→ render dereferences null → blank statusline) or
+// {"thresholds": {"ctxWarnPct": "high"}} (→ NaN comparisons silently disable
+// the colour tiers) can otherwise slip through. Rebuild from defaults, taking
+// only correctly-typed values, and drop unknown keys so `get` stays schema-true.
+function normalizeConfig(cfg) {
+  const src = isPlainObject(cfg) ? cfg : {};
+
+  const layout = LAYOUTS.includes(src.layout) ? src.layout : DEFAULT_CONFIG.layout;
+
+  const srcFields = isPlainObject(src.fields) ? src.fields : {};
+  const fields = {};
+  for (const k of KNOWN_FIELDS) {
+    fields[k] = typeof srcFields[k] === 'boolean' ? srcFields[k] : DEFAULT_CONFIG.fields[k];
+  }
+
+  const srcThresholds = isPlainObject(src.thresholds) ? src.thresholds : {};
+  const thresholds = {};
+  for (const k of KNOWN_THRESHOLDS) {
+    const v = srcThresholds[k];
+    thresholds[k] = (typeof v === 'number' && Number.isFinite(v)) ? v : DEFAULT_CONFIG.thresholds[k];
+  }
+
+  return { layout, fields, thresholds };
+}
+
 export function loadConfig({ userPath, projectPath, env } = {}) {
   let cfg = {
     layout: DEFAULT_CONFIG.layout,
@@ -84,5 +115,5 @@ export function loadConfig({ userPath, projectPath, env } = {}) {
   cfg = deepMerge(cfg, readJsonSafe(userPath));
   cfg = deepMerge(cfg, readJsonSafe(projectPath));
   cfg = applyEnv(cfg, env);
-  return cfg;
+  return normalizeConfig(cfg);
 }

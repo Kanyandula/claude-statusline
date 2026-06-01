@@ -5,7 +5,7 @@ import { claudeAdapter } from '../src/adapters/claude.js';
 import { render } from '../src/render.js';
 import { DEFAULT_CONFIG } from '../src/config.js';
 
-const sample = JSON.parse(readFileSync(new URL('./fixtures/stdin-sample.json', import.meta.url)));
+const sample = JSON.parse(readFileSync(new URL('../src/fixtures/stdin-sample.json', import.meta.url)));
 
 test('render: two-line layout (no colour) matches expected text', () => {
   const out = render(claudeAdapter(sample), { colour: false });

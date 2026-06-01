@@ -16,13 +16,25 @@ function gitCmd(cwd, args) {
   return r.stdout.trim();
 }
 
+const BRANCH_HEAD = '# branch.head ';
+
+// A single `git status --porcelain=v2 --branch` yields everything we need —
+// repo membership (non-zero exit outside a work tree), the branch name
+// (`# branch.head <name>`, or `(detached)`), and the dirty flag (any
+// non-`#` line is a changed/untracked/unmerged entry). This replaces the
+// former three sequential spawns (is-inside-work-tree, abbrev-ref, status),
+// cutting the per-render git cost to one bounded call.
 export function getGitInfo(cwd) {
   if (!cwd || !existsSync(cwd)) return null;
-  const inside = gitCmd(cwd, ['rev-parse', '--is-inside-work-tree']);
-  if (inside !== 'true') return null;
-  const branch = gitCmd(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  if (branch === null) return null;
-  const status = gitCmd(cwd, ['status', '--porcelain']);
-  if (status === null) return null;
-  return { branch, dirty: status.length > 0 };
+  const out = gitCmd(cwd, ['status', '--porcelain=v2', '--branch']);
+  if (out === null) return null;
+
+  let branch = null;
+  let dirty = false;
+  for (const line of out.split('\n')) {
+    if (line.startsWith(BRANCH_HEAD)) branch = line.slice(BRANCH_HEAD.length).trim();
+    else if (line && !line.startsWith('#')) dirty = true;
+  }
+  if (!branch) return null;
+  return { branch, dirty };
 }

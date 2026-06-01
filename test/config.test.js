@@ -157,6 +157,52 @@ test('loadConfig: rejects non-.json extension (arbitrary file read defence)', ()
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('loadConfig: normalizes fields:null back to defaults (no blank statusline)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'u.json');
+  writeFileSync(file, JSON.stringify({ fields: null }));
+  try {
+    const cfg = loadConfig({ userPath: file });
+    assert.deepEqual(cfg.fields, DEFAULT_CONFIG.fields);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('loadConfig: non-boolean field value falls back to its default', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'u.json');
+  // cost as a string should not be treated as truthy config
+  writeFileSync(file, JSON.stringify({ fields: { cost: 'yes', ctx: false } }));
+  try {
+    const cfg = loadConfig({ userPath: file });
+    assert.equal(cfg.fields.cost, true);   // invalid type → default (true)
+    assert.equal(cfg.fields.ctx, false);   // valid boolean preserved
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('loadConfig: non-number threshold falls back to its default', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'u.json');
+  writeFileSync(file, JSON.stringify({ thresholds: { ctxWarnPct: 'high', costWarnUsd: 3 } }));
+  try {
+    const cfg = loadConfig({ userPath: file });
+    assert.equal(cfg.thresholds.ctxWarnPct, 70);  // invalid → default
+    assert.equal(cfg.thresholds.costWarnUsd, 3);   // valid number preserved
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('loadConfig: unknown keys are dropped from effective config', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
+  const file = join(dir, 'u.json');
+  writeFileSync(file, JSON.stringify({ fields: { bogus: true }, extra: 1, thresholds: { junk: 9 } }));
+  try {
+    const cfg = loadConfig({ userPath: file });
+    assert.equal(cfg.fields.bogus, undefined);
+    assert.equal(cfg.thresholds.junk, undefined);
+    assert.equal(cfg.extra, undefined);
+    assert.deepEqual(Object.keys(cfg), ['layout', 'fields', 'thresholds']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('loadConfig: rejects projectPath with non-.json extension', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cstest-'));
   const file = join(dir, 'config.ini');

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-const sample = readFileSync(new URL('../fixtures/stdin-sample.json', import.meta.url), 'utf8');
+const sample = readFileSync(new URL('../../src/fixtures/stdin-sample.json', import.meta.url), 'utf8');
 
 test('bin/statusline.js shim still produces the expected output', () => {
   const r = spawnSync(process.execPath, ['bin/statusline.js'], {

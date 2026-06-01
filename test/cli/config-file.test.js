@@ -46,6 +46,18 @@ test('deleteConfigFile: missing file is a no-op', () => {
   deleteConfigFile('/does/not/exist.json');
 });
 
+test('writeConfigFile: rejects non-.json path', () => {
+  assert.throws(() => writeConfigFile('/tmp/passwd', { x: 1 }), /absolute \.json path/);
+});
+
+test('writeConfigFile: rejects relative path', () => {
+  assert.throws(() => writeConfigFile('rel.json', { x: 1 }), /absolute \.json path/);
+});
+
+test('deleteConfigFile: rejects non-.json path', () => {
+  assert.throws(() => deleteConfigFile('/etc/passwd'), /absolute \.json path/);
+});
+
 test('coerceValue: boolean / number / null / string', () => {
   assert.equal(coerceValue('true'), true);
   assert.equal(coerceValue('false'), false);

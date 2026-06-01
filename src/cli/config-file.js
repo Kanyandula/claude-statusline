@@ -1,5 +1,17 @@
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { atomicWriteJson } from './fs-util.js';
+import { isAllowedConfigPath } from '../config.js';
+
+// Writes and deletes mutate the filesystem, so they must honour the same
+// allowlist the read path enforces (config.js readJsonSafe). Without this,
+// CLAUDE_STATUSLINE_CONFIG pointing at an arbitrary file would let `set`
+// overwrite it or `reset`/`uninstall` unlink it. Resolved project/user
+// paths are always absolute .json, so only a hostile env var trips this.
+function assertWritablePath(path) {
+  if (!isAllowedConfigPath(path)) {
+    throw new Error(`refusing to use config path '${path}' (must be an absolute .json path)`);
+  }
+}
 
 export function readConfigFile(path) {
   if (!existsSync(path)) return {};
@@ -13,10 +25,12 @@ export function readConfigFile(path) {
 }
 
 export function writeConfigFile(path, obj) {
+  assertWritablePath(path);
   atomicWriteJson(path, obj);
 }
 
 export function deleteConfigFile(path) {
+  assertWritablePath(path);
   if (existsSync(path)) unlinkSync(path);
 }
 
