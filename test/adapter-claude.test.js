@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { claudeAdapter } from '../src/adapters/claude.js';
 
-const sample = JSON.parse(readFileSync(new URL('./fixtures/stdin-sample.json', import.meta.url)));
+const sample = JSON.parse(readFileSync(new URL('../src/fixtures/stdin-sample.json', import.meta.url)));
 
 test('claudeAdapter: maps every field from the sample', () => {
   const out = claudeAdapter(sample);

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { renderFromStdin } from '../src/pipeline.js';
 import { DEFAULT_CONFIG } from '../src/config.js';
 
-const sample = readFileSync(new URL('./fixtures/stdin-sample.json', import.meta.url), 'utf8');
+const sample = readFileSync(new URL('../src/fixtures/stdin-sample.json', import.meta.url), 'utf8');
 
 test('renderFromStdin: produces a string from valid JSON', () => {
   const out = renderFromStdin(sample, { config: DEFAULT_CONFIG, colour: false, gitFn: () => null });

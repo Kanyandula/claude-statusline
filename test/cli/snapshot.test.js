@@ -5,7 +5,7 @@ import { render } from '../../src/render.js';
 import { claudeAdapter } from '../../src/adapters/claude.js';
 import { DEFAULT_CONFIG } from '../../src/config.js';
 
-const sample = JSON.parse(readFileSync(new URL('../fixtures/stdin-sample.json', import.meta.url)));
+const sample = JSON.parse(readFileSync(new URL('../../src/fixtures/stdin-sample.json', import.meta.url)));
 const baseInput = claudeAdapter(sample);
 
 test('snapshot: default two-line layout (no colour) matches exact string', () => {

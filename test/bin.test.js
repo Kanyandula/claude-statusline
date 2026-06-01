@@ -5,7 +5,7 @@ import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const sample = readFileSync(new URL('./fixtures/stdin-sample.json', import.meta.url), 'utf8');
+const sample = readFileSync(new URL('../src/fixtures/stdin-sample.json', import.meta.url), 'utf8');
 
 test('bin/statusline.js: prints expected content', () => {
   const r = spawnSync(process.execPath, ['bin/statusline.js'], { input: sample, env: { ...process.env, NO_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: '/nonexistent-claude-statusline-test.json' } });

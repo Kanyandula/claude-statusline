@@ -9,7 +9,7 @@ import { computeColour } from './colour.js';
 import { parseSubcommandArgs } from './parse-args.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUNDLED_FIXTURE = join(__dirname, '..', '..', 'test', 'fixtures', 'stdin-sample.json');
+const BUNDLED_FIXTURE = join(__dirname, '..', 'fixtures', 'stdin-sample.json');
 const LIVE_CAPTURE = process.env.CLAUDE_STATUSLINE_LIVE_PATH || '/tmp/claude-stdin.json';
 
 const USAGE = `claude-statusline preview [--live]
