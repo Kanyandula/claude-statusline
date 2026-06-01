@@ -14,10 +14,13 @@ set -eu
 REPO="Kanyandula/claude-statusline"
 HELPER_DIR="$HOME/.claude/helpers/claude-statusline"
 SETTINGS="$HOME/.claude/settings.json"
-RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
+# Pin to a release tag so the file list and source stay in sync with the
+# install.sh asset published at that tag. Bump VERSION when releasing.
+VERSION="v1.0.0"
+RAW_BASE="https://raw.githubusercontent.com/$REPO/refs/tags/$VERSION"
 
-# Source files needed to render the statusline. Order doesn't matter — all
-# fetched in parallel-ish via shell loop.
+# Source files needed to render the statusline. This list MUST be updated
+# whenever new files are added to src/cli/ or src/. Pinned to VERSION above.
 FILES="
 bin/statusline.js
 src/cli/render.js

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.0.0] — Phase 5: distribution
 
 ### Added
-- Published as `@kanyandula/claude-statusline` on npm
+- Package configured for `@kanyandula/claude-statusline` on npm (publish deferred pending 2FA setup on author account)
 - GitHub repository at https://github.com/Kanyandula/claude-statusline
 - GitHub Actions CI (Linux + macOS × Node 18/20/22)
 - Issue + PR templates

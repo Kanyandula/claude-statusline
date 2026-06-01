@@ -14,12 +14,15 @@
 ## Repo layout
 
 **`src/`** — Pure renderer modules invoked by `render`. Modules: `input.js`
-(read + parse stdin JSON), `adapter.js` (normalise raw data to the internal
-model), `config.js` (load / merge effective config), `format.js` (format
-individual fields — cost, time, tokens, model), `models.js` (model
-display-name lookup), `ansi.js` (colour/SGR helpers), `git.js` (branch
-detection), `pipeline.js` (orchestrate the render pipeline), `render.js`
-(top-level entry point for the render subcommand).
+(read + parse stdin JSON), `config.js` (load / merge effective config),
+`format.js` (format individual fields — cost, time, tokens, model),
+`models.js` (model display-name lookup), `ansi.js` (colour/SGR helpers),
+`git.js` (branch detection), `pipeline.js` (orchestrate the render
+pipeline), `render.js` (top-level entry point for the render subcommand).
+
+**`src/adapters/`** — `claude.js` normalises Claude Code's stdin JSON into
+the renderer's internal model. Subdirectory hints at future adapters
+(Codex, etc.).
 
 **`src/cli/`** — CLI foundation and subcommands. Foundation modules:
 `paths.js` (config file locations), `settings.js` (read/write Claude Code

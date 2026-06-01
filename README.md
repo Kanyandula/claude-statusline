@@ -359,15 +359,8 @@ environments where richer tooling is not.
 
 ## Contributing
 
-```bash
-git clone <repo-url>
-cd claude-statusline
-npm test
-```
-
-Tests use `node --test` (built into Node ≥ 18) — no test-runner dependencies
-to install. Open a PR against `main`. A full contributor guide will be added
-in Phase 5 when the GitHub repository is public.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide — repo layout,
+adding subcommands, commit conventions, code style, and how to run tests.
 
 ---
 
