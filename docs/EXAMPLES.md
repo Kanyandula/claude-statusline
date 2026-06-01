@@ -35,7 +35,7 @@ The same result expressed as JSON (write to
 Sample output:
 
 ```
-▌ myproject  main │ Opus 4.7 (1M) │ ● 15% ctx │ $19.01
+▌  myproject  │  ⎇ main  │  Opus 4.7 (1M)  │  ● 15% ctx  │  $19.01
 ```
 
 All four core fields are present; the bar never grows with LOC or duration
@@ -60,12 +60,12 @@ of the default config.
 Sample output (two-line layout, default):
 
 ```
-▌ myproject  main  Claude Code 1.2.3
-  Opus 4.7 (1M) │ ● 72% ctx │ $4.32 │ 23m14s │ 🌐 42% │ 📐 normal
+▌  myproject  │  ⎇ main  │  Opus 4.7 (1M context)
+  ● 72% ctx  │  ⏱ 23m14s  │  $4.32  │  🌐 42%  │  📐 normal
 ```
 
 `🌐 42%` is the API ratio field; `📐 normal` is the output style. Both
-are appended after the core fields in the order they appear in `KNOWN_FIELDS`.
+sit on the metrics row, after the core fields, in field-registry order.
 
 ---
 
@@ -132,7 +132,7 @@ claude-statusline reset --scope=project
 Sample output in that project:
 
 ```
-▌ narrow-terminal  main │ Sonnet 4.5 (200k) │ ● 8% ctx │ $0.47 │ 4m02s
+▌  narrow-terminal  │  ⎇ main  │  Sonnet 4.5 (200K)  │  ● 8% ctx  │  ⏱ 4m2s  │  $0.47
 ```
 
 ---
@@ -161,10 +161,11 @@ When `NO_COLOR` is set, `claude-statusline` emits no ANSI escape codes — the
 statusline is plain text. All other config options (fields, thresholds,
 layout) still apply; they just render without colour or bold.
 
-Sample output with `NO_COLOR=1`:
+Sample output with `NO_COLOR=1` (default two-line layout):
 
 ```
-myproject  main | Opus 4.7 (1M) | 15% ctx | $19.01
+▌  myproject  │  ⎇ main  │  Opus 4.7 (1M context)
+  ● 15% ctx  │  ⏱ 23h54m  │  $19.01  │  +3225 / -186
 ```
 
 The `▌` leader and `│` separators are still Unicode characters, but no colour
@@ -256,7 +257,7 @@ Equivalent JSON:
 Sample output:
 
 ```
-▌ Opus 4.7 (1M) │ ● 15% ctx │ $19.01
+▌  Opus 4.7 (1M)  │  ● 15% ctx  │  $19.01
 ```
 
 Only the three fields that matter at a glance — model, context pressure, and
@@ -293,8 +294,8 @@ Equivalent JSON:
 Sample output at $11 into a session:
 
 ```
-▌ myproject  main  Claude Code 1.2.3
-  Opus 4.7 (1M) │ ● 55% ctx │ $11.20 │ 41m03s │ 🌐 61%
+▌  myproject  │  ⎇ main  │  Opus 4.7 (1M context)
+  ● 55% ctx  │  ⏱ 41m3s  │  $11.20  │  🌐 61%
 ```
 
 The `$11.20` renders in **red** (past the $10 danger threshold). The

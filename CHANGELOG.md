@@ -10,18 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.0.0] — Phase 5: distribution
 
 ### Added
-- Package configured for `@kanyandula/claude-statusline` on npm (publish deferred pending 2FA setup on author account)
+- Published to npm as [`@kanyandula/claude-statusline`](https://www.npmjs.com/package/@kanyandula/claude-statusline)
 - GitHub repository at https://github.com/Kanyandula/claude-statusline
 - GitHub Actions CI (Linux + macOS × Node 18/20/22)
 - Issue + PR templates
 - `install.sh` curl-install fallback for environments without npm
 - Real LICENSE copyright (Ephraim Kanyandula)
 - `CONTRIBUTING.md`
+- `npm run check` (`node --check` over `bin/`, `src/`, `test/`) syntax gate, run ahead of the test suite in `npm test` and CI
 
 ### Changed
 - `package.json` bumped to v1.0.0; added `repository`, `homepage`, `bugs`, `author`, `publishConfig`
 - npm bundle scope tightened: `docs/superpowers/` excluded via `.npmignore` + explicit `files` array
 - `dispatcher.test.js` uses absolute path via `import.meta.url` (was relative)
+- Config is normalized to the schema on load — malformed user config (e.g. `fields: null`, non-numeric thresholds, unknown keys) falls back to defaults instead of breaking the render
+- Branch/dirty lookup collapsed from three sequential `git` calls to a single bounded `git status --porcelain=v2 --branch`; detached HEAD now shows `(detached)`
+- Renderer refactored to a single field registry (each field owns its config key, two-line row, and build function) — no behaviour change
+- Preview sample moved from `test/fixtures/` to `src/fixtures/`; no `test/` files ship in the npm bundle
+
+### Security
+- Config write/delete paths now honour the same absolute-`.json` allowlist as reads: `set`, `reset`, and `uninstall` refuse a `CLAUDE_STATUSLINE_CONFIG` that points outside an absolute `.json` path
 
 ## [0.4.0] — Phase 4: docs + tests polish
 

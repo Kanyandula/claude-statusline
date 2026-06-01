@@ -24,9 +24,11 @@ user-level file with a custom location (see [Env-var overrides](#6-env-var-overr
 4. Built-in defaults
 
 Missing files and invalid JSON are silently ignored — built-in defaults apply
-in their place. The two JSON files are merged key-by-key (not deep-merged):
-a project file that sets only `layout` leaves `fields` and `thresholds` from
-the user file (or defaults).
+in their place. The two JSON files are **deep-merged**: nested objects merge
+key-by-key, so a project file that sets only `fields.cost` leaves every other
+`fields` entry (and all of `thresholds`) from the user file or defaults
+untouched. After merging, the result is normalized to the schema — see
+[Validation rules](#8-validation-rules).
 
 ---
 
@@ -86,8 +88,8 @@ Enable or disable individual statusline fields. Each key is a **boolean**;
 | Name | Type | Default | Source data | What it shows |
 |---|---|---|---|---|
 | `project` | boolean | `true` | `workspace.current_dir` (basename) | Project directory name |
-| `branch` | boolean | `true` | `git rev-parse --abbrev-ref HEAD` in cwd | Branch name; appends `*` when working tree is dirty |
-| `model` | boolean | `true` | `model.display_name` (parsed) | Model name + context-window size (e.g. `claude-3-7-sonnet · 200k`) |
+| `branch` | boolean | `true` | single `git status --porcelain=v2 --branch` in cwd | Branch name (`(detached)` when detached); appends `*` when working tree is dirty |
+| `model` | boolean | `true` | `model.display_name` (parsed) | Model name + context-window size (e.g. `Opus 4.7 (1M context)`) |
 | `ctx` | boolean | `true` | `context_window.used_percentage` | `● N% ctx` — colour-coded by threshold |
 | `duration` | boolean | `true` | `cost.total_duration_ms` | Session wall time; auto-scales to `Xs`, `XmYs`, or `XhYm` |
 | `cost` | boolean | `true` | `cost.total_cost_usd` | Session cost in USD; colour-coded by threshold |
@@ -131,7 +133,7 @@ All env vars are read from `process.env`. None are required.
 
 | Env var | What it does |
 |---|---|
-| `CLAUDE_STATUSLINE_CONFIG` | Absolute path (must end in `.json`) used as the user config file. Replaces `~/.claude/claude-statusline.json`. |
+| `CLAUDE_STATUSLINE_CONFIG` | Absolute path (must end in `.json`) used as the user config file. Replaces `~/.claude/claude-statusline.json`. The same constraint applies to writes: `set`, `reset`, and `uninstall` refuse a path that is not an absolute `.json`. |
 | `CLAUDE_STATUSLINE_LAYOUT` | `single` or `two-line`. Any other value is silently ignored. |
 | `CLAUDE_STATUSLINE_FIELDS` | Comma-separated allow-list of field names (e.g. `project,branch,ctx`). **Replace semantics** — only the listed fields are enabled; all others are hidden. An empty string is ignored. |
 | `CLAUDE_STATUSLINE_LIVE_PATH` | File path polled by `preview --live`. Default: `/tmp/claude-stdin.json`. |
@@ -236,6 +238,13 @@ What the CLI accepts and rejects:
 - A file containing invalid JSON is treated as missing — silently ignored,
   built-in defaults apply. Use `CLAUDE_STATUSLINE_DEBUG=1` to surface parse
   errors to stderr.
+
+### Config file writes (`set` / `reset` / `uninstall`)
+
+- Writes and deletes go only to an absolute `.json` path. A
+  `CLAUDE_STATUSLINE_CONFIG` that is relative or lacks a `.json` extension is
+  refused with a clear error — the same allowlist that guards reads — so a
+  stray env var can never cause an arbitrary file to be overwritten or deleted.
 
 ### settings.json corruption
 

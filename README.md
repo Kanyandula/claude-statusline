@@ -59,17 +59,18 @@ Two layouts are available. The default is `two-line`.
 
 ```
 ▌  myproject  │  ⎇ main*  │  Sonnet 4.5 (200K context)
-  ● 12% ctx  │  ⏱ 1h03m  │  $0.42  │  +104 / -18
+  ● 12% ctx  │  ⏱ 1h3m  │  $0.42  │  +104 / -18
 ```
 
 ### `single`
 
 ```
-▌  myproject  │  ⎇ main*  │  Sonnet 4.5 (200K)  │  ●12%  │  ⏱1h03m  │  $0.42  │  +104/-18
+▌  myproject  │  ⎇ main*  │  Sonnet 4.5 (200K)  │  ● 12% ctx  │  ⏱ 1h3m  │  $0.42  │  +104/-18
 ```
 
 `single` is more compact: it drops " context" from the model label and uses
-tight LOC formatting without spaces around the slash.
+tight LOC formatting without spaces around the slash. The other fields keep
+their normal form.
 
 Switch layouts:
 
@@ -86,7 +87,7 @@ Fields are individually togglable. Two fields are off by default.
 | Field | Default | Source | What it shows |
 |---|---|---|---|
 | `project` | on | basename of cwd | Current project/directory name |
-| `branch` | on | `git rev-parse` + porcelain check | Current branch; `*` suffix when working tree is dirty |
+| `branch` | on | single `git status --porcelain=v2 --branch` | Current branch (`(detached)` when detached); `*` suffix when working tree is dirty |
 | `model` | on | `model.display_name` (parsed) | Claude model name + context window size |
 | `ctx` | on | `context_window.used_percentage` | Percentage of context window consumed |
 | `duration` | on | `cost.total_duration_ms` | Wall-clock session time (e.g. `23h54m`) |
@@ -287,22 +288,29 @@ Work through this checklist in order:
 2. **Restart Claude Code completely.** The settings file is read at startup.
    Run `/exit` inside Claude Code and relaunch — a reload is not enough.
 
-3. **Test the render script standalone.** Pipe the bundled sample payload
-   through `render` to confirm the binary works:
+3. **Test the renderer standalone.** The quickest check is `preview`, which
+   renders the bundled sample payload without needing Claude Code running:
 
    ```bash
-   cat ~/claude-statusline/test/fixtures/stdin-sample.json | claude-statusline render
+   claude-statusline preview
    ```
 
-   If the package is installed globally via npm, `claude-statusline` is on
-   your `PATH`. Otherwise call the binary directly:
+   To exercise the actual stdin path that Claude Code uses, pipe a payload
+   through `render`:
 
    ```bash
-   cat /path/to/repo/test/fixtures/stdin-sample.json | node /path/to/repo/bin/statusline.js
+   echo '{"model":{"display_name":"Opus 4.7 (1M context)"},"workspace":{"current_dir":"'"$PWD"'"}}' | claude-statusline render
    ```
 
-   You should see two lines of rendered output. If you see an error, that is
-   where to focus.
+   If you are working from a clone rather than a global install, the bundled
+   sample lives at `src/fixtures/stdin-sample.json`:
+
+   ```bash
+   cat src/fixtures/stdin-sample.json | node bin/statusline.js
+   ```
+
+   You should see one or two lines of rendered output. If you see an error,
+   that is where to focus.
 
 4. **Verify `settings.json` has the `statusLine` block.**
 
