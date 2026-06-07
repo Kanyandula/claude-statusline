@@ -1,6 +1,6 @@
 {
   "name": "@kanyandula/claude-statusline",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A configurable statusline for Claude Code with init/preview/uninstall CLI.",
   "type": "module",
   "engines": {
