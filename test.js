@@ -4,7 +4,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { readPayload } from './statusline.js';
+import {
+  readPayload,
+  spatialLayout,
+  contextBar, pctLabel, formatDuration, formatCost, formatLoc, sizeLabel,
+} from './statusline.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const fixture = (name) => readFileSync(join(HERE, 'fixtures', `${name}.json`), 'utf8');
@@ -110,4 +114,116 @@ test('modelShort strips claude- prefix and date/bracket suffixes', () => {
     const vm = readPayload(JSON.stringify({ model: { id } }));
     assert.equal(vm.modelShort, expected, `id=${id}`);
   }
+});
+
+// ── A2: spatial layout (pure) ───────────────────────────────────────────────
+// (viewModel, config) → string[]. No color, no I/O. Fixed-width metric fields,
+// null fallbacks, progressive disclosure of the context-size label.
+
+// pure formatters — exact output
+
+test('contextBar fills 10 cells proportionally; null → empty bar', () => {
+  assert.equal(contextBar(0), '▱▱▱▱▱▱▱▱▱▱');
+  assert.equal(contextBar(8), '▰▱▱▱▱▱▱▱▱▱');      // round(0.8) = 1 cell
+  assert.equal(contextBar(50), '▰▰▰▰▰▱▱▱▱▱');
+  assert.equal(contextBar(100), '▰▰▰▰▰▰▰▰▰▰');
+  assert.equal(contextBar(150), '▰▰▰▰▰▰▰▰▰▰');     // clamped
+  assert.equal(contextBar(null), '▱▱▱▱▱▱▱▱▱▱');
+});
+
+test('pctLabel is fixed-width 4 chars; null → "--% "', () => {
+  assert.equal(pctLabel(8), '8%  ');
+  assert.equal(pctLabel(100), '100%');
+  assert.equal(pctLabel(null), '--% ');
+  for (const p of [0, 8, 100, null]) assert.equal(pctLabel(p).length, 4);
+});
+
+test('formatDuration auto-scales h/m/s; null → null', () => {
+  assert.equal(formatDuration(6420000), '1h47m');   // 1h 47m
+  assert.equal(formatDuration(3600000), '1h00m');
+  assert.equal(formatDuration(420000), '7m');
+  assert.equal(formatDuration(45000), '45s');
+  assert.equal(formatDuration(null), null);
+  assert.equal(formatDuration(-5), null);
+});
+
+test('formatCost is "$x.xx" right-padded to a stable width; null → null', () => {
+  assert.equal(formatCost(8.4), '$8.40  ');
+  assert.equal(formatCost(123.4), '$123.40');
+  assert.equal(formatCost(0), '$0.00  ');
+  assert.equal(formatCost(null), null);
+  assert.equal(formatCost(8.4).length, formatCost(123.4).length);
+});
+
+test('formatLoc uses +added / −removed (U+2212); both null → null', () => {
+  assert.equal(formatLoc(342, 89), '+342 / −89');
+  assert.equal(formatLoc(0, 0), '+0 / −0');
+  assert.equal(formatLoc(null, null), null);
+});
+
+test('sizeLabel humanizes window size; null → null', () => {
+  assert.equal(sizeLabel(1000000), '1M');
+  assert.equal(sizeLabel(200000), '200K');
+  assert.equal(sizeLabel(500000), '500K');
+  assert.equal(sizeLabel(null), null);
+});
+
+// composition — the two-line spatial layout
+
+const vmFull = readPayload(fixture('full'));
+
+test('spatial returns exactly two lines, no ANSI', () => {
+  const lines = spatialLayout(vmFull);
+  assert.equal(lines.length, 2);
+  for (const l of lines) assert.ok(!/\x1b/.test(l), 'no escape codes in layout');
+});
+
+test('identity line: pixel + project + model; default window hides size label', () => {
+  const [identity] = spatialLayout(vmFull);
+  assert.ok(identity.startsWith('▌ '), 'starts with health pixel glyph');
+  assert.ok(identity.includes('claude-statusline'));
+  assert.ok(identity.includes('Opus'));
+  assert.ok(!/\b1M\b|200K/.test(identity), 'no size label when window == default');
+  assert.ok(!identity.includes('· ·') && !identity.includes('·  ·'), 'null branch leaves no empty field');
+});
+
+test('state line carries ctx bar+pct, duration, cost, LOC', () => {
+  const [, state] = spatialLayout(vmFull);
+  assert.ok(state.includes('ctx '));
+  assert.ok(state.includes('▰▱▱▱▱▱▱▱▱▱'));
+  assert.ok(state.includes('8%'));
+  assert.ok(state.includes('1h47m'));
+  assert.ok(state.includes('$8.40'));
+  assert.ok(state.includes('+342 / −89'));
+});
+
+test('null used_percentage → placeholder bar + --%, still rendered', () => {
+  const vm = readPayload(JSON.stringify({ context_window: { used_percentage: null }, cost: { total_cost_usd: 1 } }));
+  const [, state] = spatialLayout(vm);
+  assert.ok(state.includes('▱▱▱▱▱▱▱▱▱▱'));
+  assert.ok(state.includes('--%'));
+});
+
+test('progressive disclosure: non-default window shows the size label', () => {
+  const vm = readPayload(JSON.stringify({ workspace: { current_dir: '/x/proj' }, model: { display_name: 'Opus' }, context_window: { context_window_size: 1000000 } }));
+  const [identity] = spatialLayout(vm);
+  assert.ok(identity.includes('1M'), 'shows 1M for extended window');
+});
+
+test('branch is shown on the identity line once overlaid', () => {
+  const vm = { ...vmFull, branch: 'main' };
+  const [identity] = spatialLayout(vm);
+  assert.ok(identity.includes('main'));
+});
+
+test('suppressed cost is omitted from the state line', () => {
+  const vm = { ...vmFull, costUsd: null };
+  const [, state] = spatialLayout(vm);
+  assert.ok(!state.includes('$'));
+});
+
+test('config.separators overrides the field separator', () => {
+  const [identity] = spatialLayout(vmFull, { separators: '|' });
+  assert.ok(identity.includes('|'));
+  assert.ok(!identity.includes('·'));
 });

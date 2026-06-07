@@ -109,3 +109,84 @@ export function buildViewModel(raw) {
 export function readPayload(raw) {
   return buildViewModel(parseInput(raw));
 }
+
+// ── formatters (pure) ────────────────────────────────────────────────────────
+// All return display strings (or null when there is nothing to show). Fixed
+// widths keep the line from jittering as values change. No color here — that
+// is colorize's job (A3).
+
+const BAR_CELLS = 10;
+
+// 10-cell context bar. Null (fresh session / post-/compact) → an all-empty bar
+// so the field still renders in a stable width; the caller pairs it with --%.
+export function contextBar(pct, cells = BAR_CELLS) {
+  if (pct == null) return '▱'.repeat(cells);
+  const filled = Math.max(0, Math.min(cells, Math.round((pct / 100) * cells)));
+  return '▰'.repeat(filled) + '▱'.repeat(cells - filled);
+}
+
+// Right-padded to a fixed 4 chars ("8%  ", "100%", "--% ") so the bar's
+// trailing edge never shifts.
+export function pctLabel(pct) {
+  const s = pct == null ? '--%' : `${Math.round(pct)}%`;
+  return s.padEnd(4);
+}
+
+// Wall-clock duration, auto-scaled. Hours show zero-padded minutes ("1h47m",
+// "1h00m"); minutes drop seconds ("7m"); under a minute shows seconds ("45s").
+export function formatDuration(ms) {
+  if (ms == null || ms < 0) return null;
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h${String(m).padStart(2, '0')}m`;
+  if (m > 0) return `${m}m`;
+  return `${s}s`;
+}
+
+// "$x.xx" right-padded so the cents column and the next separator stay put as
+// the dollar count grows.
+export function formatCost(n) {
+  if (n == null) return null;
+  return `$${n.toFixed(2)}`.padEnd(7);
+}
+
+// "+added / −removed" (− is U+2212, matching the plan). Both null → null.
+export function formatLoc(added, removed) {
+  if (added == null && removed == null) return null;
+  return `+${added ?? 0} / −${removed ?? 0}`;
+}
+
+// Humanize a context-window size: 1000000 → "1M", 200000 → "200K".
+export function sizeLabel(size) {
+  if (size == null) return null;
+  if (size >= 1_000_000) return `${(size / 1_000_000).toString().replace(/\.0$/, '')}M`;
+  if (size >= 1_000) return `${Math.round(size / 1_000)}K`;
+  return String(size);
+}
+
+// ── spatial layout (pure) ────────────────────────────────────────────────────
+// (viewModel, config) → string[] (one entry per line). Two lines: an identity
+// line led by the health-pixel glyph, and a state line of metric fields. Color
+// is applied later by colorize; this stays structure-only.
+export function spatialLayout(vm, config = {}) {
+  const sep = config.separators ?? '·';
+  const defaultSize = config.defaultWindowSize ?? 200000;
+  const join = (parts) => parts.filter((p) => p != null && p !== '').join(` ${sep} `);
+
+  // Identity: ▌ project · branch · model [· size-when-non-default]
+  const model = vm.modelName ?? vm.modelShort ?? null;
+  const size =
+    vm.contextWindowSize != null && vm.contextWindowSize !== defaultSize
+      ? sizeLabel(vm.contextWindowSize)
+      : null;
+  const identity = `▌ ${join([vm.projectName, vm.branch, model, size])}`;
+
+  // State: ctx <bar> <pct> · ⏱ <dur> · <cost> · <loc>
+  const ctx = `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`;
+  const dur = vm.durationMs != null ? `⏱ ${formatDuration(vm.durationMs)}` : null;
+  const state = join([ctx, dur, formatCost(vm.costUsd), formatLoc(vm.linesAdded, vm.linesRemoved)]);
+
+  return [identity, state];
+}
