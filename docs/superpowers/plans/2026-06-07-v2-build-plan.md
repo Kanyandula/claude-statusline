@@ -31,13 +31,14 @@ Available but not yet wired (verified present in stdin — weigh against the fiv
 
 - `rate_limits.five_hour.used_percentage` / `seven_day.used_percentage` — **Pro/Max only, absent on API billing** (including the LiteLLM-proxy work setup, where it will never populate). A genuinely good "am I about to be throttled" signal for personal Pro/Max sessions, but it **does not displace cost/burn-rate** — those stay the always-available economic field. Wired as a Phase C opt-in, **off by default**, self-suppressing when the window is absent (`// empty` guard — never render an empty/stale limit). Flip it on per-machine via the config file.
 - `context_window.remaining_percentage`, `exceeds_200k_tokens` — cheap secondary context signals.
+- `effort.level` — **documented stdin field** (`low`/`medium`/`high`/`xhigh`/`max`; ultracode reports as `xhigh`). Live value, reflects mid-session `/effort` changes. Absent when the current model doesn't support the effort parameter ⇒ self-suppressing. No `settings.json` read needed. Wired as a Phase C opt-in (C3), off by default. `thinking.enabled` and `vim.mode` are likewise present but lower-value.
 
 Version caveat: `context_window.total_input_tokens` / `total_output_tokens` changed meaning at **v2.1.132** (current-context vs cumulative-session). Any optional API-ratio field built on them renders differently across CC versions — note the floor or drop it.
 
 Known gaps — design around them, don't fake them:
 
 - **plan mode / sandbox** are not in stdin (open issue `anthropics/claude-code#30189`). Any indicator would be permanently stale. Omit until exposed.
-- **effort level** is not in stdin — only readable from `~/.claude/settings.json`. Treat as opt-in, settings-sourced, off by default.
+- (**effort level** was previously listed here as a gap — it is **not** a gap. `effort.level` is a documented stdin field; see "available but not yet wired" above. Corrected 2026-06-07 against the live statusLine docs.)
 
 All field access lives in **one adapter** (`readPayload(stdin) → ViewModel`). Schema drift becomes a one-line fix. This is the "derive from authoritative source" principle enforced structurally rather than promised in prose.
 
@@ -155,7 +156,7 @@ The v1 failure mode this plan exists to prevent: tests that pass without renderi
 - [ ] C0 `powerline` layout (Nerd Font, capability-gated)
 - [ ] C1 API output-token ratio (note the v2.1.132 semantics floor, or drop)
 - [ ] C2 output-style glyph
-- [ ] C3 effort level (settings-sourced, off by default)
+- [ ] C3 effort level — stdin `effort.level` (low/medium/high/xhigh/max; ultracode→xhigh), self-suppressing when absent; off by default. (No `settings.json` read — corrected from the original settings-sourced assumption.)
 - [ ] C4 `rate_limits` field (Pro/Max only, off by default, self-suppressing on API/proxy billing)
 - [ ] C5 OSC-8 clickable project → repo (capability-gated to iTerm2 / Kitty / WezTerm)
 
