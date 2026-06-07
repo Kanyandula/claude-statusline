@@ -1,34 +1,29 @@
 {
   "name": "@kanyandula/claude-statusline",
-  "version": "1.0.3",
-  "description": "A configurable statusline for Claude Code with init/preview/uninstall CLI.",
+  "version": "2.0.0",
+  "description": "A fast, dependency-free spatial status line for Claude Code — context bar, health-pixel accent, threshold color.",
   "type": "module",
   "engines": {
     "node": ">=18"
   },
   "bin": {
-    "claude-statusline": "./bin/claude-statusline.js",
-    "claude-statusline-render": "./bin/statusline.js"
+    "claude-statusline": "./cli.js"
   },
   "scripts": {
-    "check": "for f in $(find bin src test -name '*.js'); do node --check \"$f\" || exit 1; done",
-    "test": "npm run check && node --test"
+    "check": "node --check statusline.js && node --check cli.js",
+    "test": "npm run check && node --test test.js"
   },
   "files": [
-    "bin/",
-    "src/",
+    "statusline.js",
+    "cli.js",
     "README.md",
     "CHANGELOG.md",
-    "CONTRIBUTING.md",
-    "LICENSE",
-    "docs/CONFIG.md",
-    "docs/EXAMPLES.md"
+    "LICENSE"
   ],
   "keywords": [
     "claude",
     "claude-code",
     "statusline",
-    "cli",
     "ansi",
     "prompt"
   ],
