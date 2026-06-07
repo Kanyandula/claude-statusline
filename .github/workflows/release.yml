@@ -31,6 +31,11 @@ jobs:
             echo "::error::tag v$tag != package.json $pkg"; exit 1
           fi
 
+      # Trusted Publishing (OIDC) registry auth needs npm >= 11.5.1;
+      # Node 22 ships npm 10.x, so upgrade before publishing.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
       - name: Test
         run: npm test
 
