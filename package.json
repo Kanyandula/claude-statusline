@@ -1,9 +1,11 @@
 {
   "name": "@kanyandula/claude-statusline",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A configurable statusline for Claude Code with init/preview/uninstall CLI.",
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "bin": {
     "claude-statusline": "./bin/claude-statusline.js",
     "claude-statusline-render": "./bin/statusline.js"
@@ -22,7 +24,14 @@
     "docs/CONFIG.md",
     "docs/EXAMPLES.md"
   ],
-  "keywords": ["claude", "claude-code", "statusline", "cli", "ansi", "prompt"],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "statusline",
+    "cli",
+    "ansi",
+    "prompt"
+  ],
   "author": "Ephraim Kanyandula",
   "license": "MIT",
   "homepage": "https://github.com/Kanyandula/claude-statusline#readme",
