@@ -4,9 +4,11 @@
 // is a one-line fix here, never scattered through the renderer. Phase A1 ships
 // the adapter + view-model; layout/colorize/emit land in later A-tasks.
 
-import { basename } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 
 // ── stdin parsing ────────────────────────────────────────────────────────────
 
@@ -231,7 +233,7 @@ export function spatialLayout(vm, config = {}, paint = PLAIN) {
       : null;
   const idBody = assemble([
     ['project', project],
-    ['branch', branchLabel(vm)],
+    ['branch', branchLabel(vm, { aheadBehind: config.fields?.gitAheadBehind ?? true })],
     ['model', model],
     ['size', size],
   ]);
@@ -301,11 +303,120 @@ function makePainter(vm, config, useColour) {
   };
 }
 
-// colorize(vm, config, useColour) → string[]. The same two lines as
-// spatialLayout, with threshold color applied. Stripping the ANSI yields the
-// exact structure layout (golden-test invariant).
+// Layout registry — config.layout selects one; spatial is the only one shipped
+// (compact/zen/powerline land in later phases). Unknown ⇒ spatial.
+const LAYOUTS = { spatial: spatialLayout };
+export const IMPLEMENTED_LAYOUTS = Object.keys(LAYOUTS);
+function layoutFor(config) {
+  return LAYOUTS[config?.layout] ?? spatialLayout;
+}
+
+// colorize(vm, config, useColour) → string[]. The selected layout with
+// threshold color applied. Stripping the ANSI yields the exact structure
+// layout (golden-test invariant).
 export function colorize(vm, config = {}, useColour = supportsColor()) {
-  return spatialLayout(vm, config, makePainter(vm, config, useColour));
+  return layoutFor(config)(vm, config, makePainter(vm, config, useColour));
+}
+
+// ── config (B5) ──────────────────────────────────────────────────────────────
+// Single resolved config: defaults → user file (~/.claude/statusline.json) →
+// env. Normalized to the known schema (wrong-typed values fall back, unknown
+// keys dropped) so a hand-edited file can't blank the bar or NaN the thresholds.
+
+export const DEFAULT_CONFIG = {
+  layout: 'spatial',
+  separators: '·',
+  defaultWindowSize: 200000,
+  maxProjectWidth: 24,
+  thresholds: {
+    context: { warn: 60, danger: 85 },
+    cost: { warn: 5, danger: 20 },
+  },
+  fields: {
+    burnRate: false,
+    apiRatio: false,
+    outputStyle: false,
+    gitAheadBehind: true,
+    rateLimits: false,
+  },
+};
+
+function defaultConfigPath() {
+  return join(homedir(), '.claude', 'statusline.json');
+}
+
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const finiteNum = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+
+// Reject paths that aren't an absolute *.json — guards against a stray
+// CLAUDE_STATUSLINE_CONFIG pointing the loader at /etc/passwd or a relative
+// cwd-dependent file whose JSON-shaped content could leak into config.
+export function isAllowedConfigPath(p) {
+  return typeof p === 'string' && p.length > 0 && isAbsolute(p) && /\.json$/i.test(p);
+}
+
+function readJsonSafe(path) {
+  if (!isAllowedConfigPath(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function deepMerge(base, over) {
+  if (!isPlainObject(over)) return base;
+  const out = { ...base };
+  for (const k of Object.keys(over)) {
+    const a = base?.[k];
+    const b = over[k];
+    out[k] = isPlainObject(a) && isPlainObject(b) ? deepMerge(a, b) : b;
+  }
+  return out;
+}
+
+function applyEnv(cfg, env) {
+  if (!isPlainObject(env)) return cfg;
+  let out = cfg;
+  if (IMPLEMENTED_LAYOUTS.includes(env.CLAUDE_STATUSLINE_LAYOUT)) {
+    out = { ...out, layout: env.CLAUDE_STATUSLINE_LAYOUT };
+  }
+  return out;
+}
+
+// Rebuild from defaults taking only correctly-typed values; drop unknown keys.
+function normalizeConfig(cfg) {
+  const s = isPlainObject(cfg) ? cfg : {};
+  const st = isPlainObject(s.thresholds) ? s.thresholds : {};
+  const band = (src, def) => ({
+    warn: finiteNum(src?.warn, def.warn),
+    danger: finiteNum(src?.danger, def.danger),
+  });
+  const sf = isPlainObject(s.fields) ? s.fields : {};
+  const fields = {};
+  for (const k of Object.keys(DEFAULT_CONFIG.fields)) {
+    fields[k] = typeof sf[k] === 'boolean' ? sf[k] : DEFAULT_CONFIG.fields[k];
+  }
+  const mpw = finiteNum(s.maxProjectWidth, DEFAULT_CONFIG.maxProjectWidth);
+  return {
+    layout: IMPLEMENTED_LAYOUTS.includes(s.layout) ? s.layout : DEFAULT_CONFIG.layout,
+    separators: typeof s.separators === 'string' && s.separators ? s.separators : DEFAULT_CONFIG.separators,
+    defaultWindowSize: finiteNum(s.defaultWindowSize, DEFAULT_CONFIG.defaultWindowSize),
+    maxProjectWidth: mpw > 0 ? Math.floor(mpw) : DEFAULT_CONFIG.maxProjectWidth,
+    thresholds: {
+      context: band(st.context, DEFAULT_CONFIG.thresholds.context),
+      cost: band(st.cost, DEFAULT_CONFIG.thresholds.cost),
+    },
+    fields,
+  };
+}
+
+export function loadConfig({ userPath, env = process.env } = {}) {
+  const path = userPath ?? env.CLAUDE_STATUSLINE_CONFIG ?? defaultConfigPath();
+  let cfg = deepMerge(DEFAULT_CONFIG, readJsonSafe(path));
+  cfg = applyEnv(cfg, env);
+  return normalizeConfig(cfg);
 }
 
 // ── git overlay (B3) ─────────────────────────────────────────────────────────
@@ -366,11 +477,14 @@ export function overlayGit(vm, git) {
 }
 
 // Compose the identity-line branch segment: name + dirty star + ahead/behind.
-export function branchLabel(vm) {
+// `aheadBehind` (config field gitAheadBehind) gates the ↑/↓ counts.
+export function branchLabel(vm, { aheadBehind = true } = {}) {
   if (!vm.branch) return null;
   let s = `${vm.branch}${vm.dirty ? '*' : ''}`;
-  if (vm.ahead) s += ` ↑${vm.ahead}`;
-  if (vm.behind) s += ` ↓${vm.behind}`;
+  if (aheadBehind) {
+    if (vm.ahead) s += ` ↑${vm.ahead}`;
+    if (vm.behind) s += ` ↓${vm.behind}`;
+  }
   return s;
 }
 
@@ -408,7 +522,8 @@ async function main(argv = process.argv.slice(2)) {
   let useColour;
   if (argv.includes('--color')) useColour = true;
   else if (argv.includes('--no-color')) useColour = false;
-  process.stdout.write(renderLine(await readStdin(), { useColour }) + '\n');
+  const config = loadConfig({ env: process.env });
+  process.stdout.write(renderLine(await readStdin(), { useColour, config }) + '\n');
 }
 
 // Run only when executed directly (`node statusline.js`), never when imported by

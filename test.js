@@ -313,8 +313,11 @@ test('custom thresholds shift the bands', () => {
 import { spawnSync } from 'node:child_process';
 
 const ENTRY = join(HERE, 'statusline.js');
+// Point config loading at a path that can't exist, so golden tests render with
+// defaults regardless of any real ~/.claude/statusline.json on the dev box.
+const NO_USER_CONFIG = '/nonexistent/cs-test-no-config.json';
 function runEntry(input, { color = false } = {}) {
-  const env = { ...process.env, NO_COLOR: '', FORCE_COLOR: color ? '1' : '' };
+  const env = { ...process.env, NO_COLOR: '', FORCE_COLOR: color ? '1' : '', CLAUDE_STATUSLINE_CONFIG: NO_USER_CONFIG };
   if (!color) delete env.FORCE_COLOR;
   const r = spawnSync(process.execPath, [ENTRY], { input, encoding: 'utf8', env });
   assert.equal(r.status, 0, `entry exited ${r.status}: ${r.stderr}`);
@@ -391,7 +394,7 @@ const tmpSettings = () => join(mkdtempSync(join(tmpdir(), 'cs-')), 'settings.jso
 test('forced color: --color makes the piped (non-TTY) entry emit ANSI', () => {
   const r = spawnSync(process.execPath, [ENTRY, '--color'], {
     input: fixture('full'), encoding: 'utf8',
-    env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '' },
+    env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '', CLAUDE_STATUSLINE_CONFIG: NO_USER_CONFIG },
   });
   assert.equal(r.status, 0);
   assert.ok(/\x1b\[/.test(r.stdout), 'color present despite non-TTY stdout');
@@ -399,7 +402,7 @@ test('forced color: --color makes the piped (non-TTY) entry emit ANSI', () => {
 
 test('--no-color forces plain even under FORCE_COLOR', () => {
   const r = spawnSync(process.execPath, [ENTRY, '--no-color'], {
-    input: fixture('full'), encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1' },
+    input: fixture('full'), encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1', CLAUDE_STATUSLINE_CONFIG: NO_USER_CONFIG },
   });
   assert.ok(!/\x1b\[/.test(r.stdout), 'no escapes with --no-color');
 });
@@ -567,4 +570,81 @@ test('golden: the entry overlays a real repo branch onto the identity line', () 
   const { dir } = tempGitRepo();
   const id = pipe({ workspace: { current_dir: dir }, model: { display_name: 'Opus' } }).split('\n')[0];
   assert.ok(id.includes('work'), `branch overlaid: ${id}`);
+});
+
+// ── B5: config loader (defaults → user file → env, normalized) ──────────────
+
+import { loadConfig, DEFAULT_CONFIG } from './statusline.js';
+
+const tmpConfig = (obj) => {
+  const p = join(mkdtempSync(join(tmpdir(), 'cscfg-')), 'statusline.json');
+  wf(p, typeof obj === 'string' ? obj : JSON.stringify(obj));
+  return p;
+};
+
+test('loadConfig returns defaults when no file is present', () => {
+  const c = loadConfig({ userPath: '/nonexistent/x.json', env: {} });
+  assert.equal(c.layout, 'spatial');
+  assert.equal(c.separators, '·');
+  assert.equal(c.defaultWindowSize, 200000);
+  assert.deepEqual(c.thresholds.context, { warn: 60, danger: 85 });
+  assert.deepEqual(c.thresholds.cost, { warn: 5, danger: 20 });
+  assert.equal(c.fields.gitAheadBehind, true);
+  assert.equal(c.fields.burnRate, false);
+});
+
+test('user file overrides defaults; unspecified keys keep their defaults', () => {
+  const c = loadConfig({ userPath: tmpConfig({ separators: '|', thresholds: { cost: { warn: 10 } } }), env: {} });
+  assert.equal(c.separators, '|');
+  assert.equal(c.thresholds.cost.warn, 10);
+  assert.equal(c.thresholds.cost.danger, 20);          // default preserved
+  assert.deepEqual(c.thresholds.context, { warn: 60, danger: 85 });
+});
+
+test('env CLAUDE_STATUSLINE_CONFIG selects the user file path', () => {
+  const p = tmpConfig({ separators: '+' });
+  const c = loadConfig({ env: { CLAUDE_STATUSLINE_CONFIG: p } });
+  assert.equal(c.separators, '+');
+});
+
+test('config path must be absolute and .json (else ignored)', () => {
+  assert.equal(loadConfig({ userPath: 'relative.json', env: {} }).separators, '·');
+  assert.equal(loadConfig({ userPath: '/etc/passwd', env: {} }).separators, '·');
+});
+
+test('normalize clamps wrong-typed values back to defaults', () => {
+  const c = loadConfig({ userPath: tmpConfig({
+    separators: 123,
+    maxProjectWidth: -5,
+    thresholds: { context: { warn: 'high' } },
+    fields: { gitAheadBehind: 'yes' },
+  }), env: {} });
+  assert.equal(c.separators, '·');
+  assert.equal(c.maxProjectWidth, DEFAULT_CONFIG.maxProjectWidth);
+  assert.equal(c.thresholds.context.warn, 60);
+  assert.equal(c.fields.gitAheadBehind, true);
+});
+
+test('unknown keys are dropped (schema stays true)', () => {
+  const c = loadConfig({ userPath: tmpConfig({ bogus: 1, layout: 'spatial' }), env: {} });
+  assert.ok(!('bogus' in c));
+});
+
+test('an invalid layout falls back to spatial', () => {
+  const c = loadConfig({ userPath: tmpConfig({ layout: 'hologram' }), env: {} });
+  assert.equal(c.layout, 'spatial');
+});
+
+test('gitAheadBehind:false hides ahead/behind on the identity line', () => {
+  const vm = { ...vmFull, branch: 'work', dirty: true, ahead: 2, behind: 1 };
+  const [withAB] = spatialLayout(vm, { fields: { gitAheadBehind: true } });
+  const [withoutAB] = spatialLayout(vm, { fields: { gitAheadBehind: false } });
+  assert.ok(withAB.includes('↑2') && withAB.includes('↓1'));
+  assert.ok(withoutAB.includes('work*') && !withoutAB.includes('↑2') && !withoutAB.includes('↓1'));
+});
+
+test('loaded config drives colorize thresholds end to end', () => {
+  const cfg = loadConfig({ userPath: tmpConfig({ thresholds: { cost: { warn: 10 } } }), env: {} });
+  const line = colorize(vmOf({ cost: { total_cost_usd: 8 } }), cfg, true)[1];
+  assert.ok(line.includes('\x1b[32m'), '$8 is green when warn is raised to $10');
 });
