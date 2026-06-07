@@ -182,6 +182,16 @@ export function formatLoc(added, removed) {
   return `+${added ?? 0} / −${removed ?? 0}`;
 }
 
+// Session-average burn rate: cost ÷ wall-clock hours. Wall-clock (not API time)
+// because idle time is still spend. Stateless and labeled an average — a
+// rolling/"current" rate would need a session-keyed state file (out of scope).
+// Self-suppresses (null) when cost is absent or duration is 0 (first tick).
+export function formatBurnRate(costUsd, durationMs) {
+  if (costUsd == null || durationMs == null || durationMs <= 0) return null;
+  const rate = costUsd / (durationMs / 3_600_000);
+  return `↑$${rate >= 10 ? String(Math.round(rate)) : rate.toFixed(1)}/h`;
+}
+
 // Truncate an over-long string with a trailing ellipsis so the identity line
 // can't blow out the terminal width. max counts the visible characters,
 // ellipsis included.
@@ -240,11 +250,14 @@ export function spatialLayout(vm, config = {}, paint = PLAIN) {
   const pixel = paint('pixel', '▌');
   const identity = idBody ? `${pixel} ${idBody}` : pixel;
 
-  // State: ctx <bar> <pct> · ⏱ <dur> · <cost> · <loc>. ctx is always present.
+  // State: ctx <bar> <pct> · ⏱ <dur> · <cost> [· <burn>] · <loc>. ctx is always
+  // present; burn-rate only when the field is enabled and computable.
+  const burn = config.fields?.burnRate ? formatBurnRate(vm.costUsd, vm.durationMs) : null;
   const state = assemble([
     ['ctx', `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`],
     vm.durationMs != null ? ['duration', `⏱ ${formatDuration(vm.durationMs)}`] : null,
     ['cost', formatCost(vm.costUsd)],
+    ['burn', burn],
     ['loc', formatLoc(vm.linesAdded, vm.linesRemoved)],
   ]);
 

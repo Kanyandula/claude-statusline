@@ -648,3 +648,45 @@ test('loaded config drives colorize thresholds end to end', () => {
   const line = colorize(vmOf({ cost: { total_cost_usd: 8 } }), cfg, true)[1];
   assert.ok(line.includes('\x1b[32m'), '$8 is green when warn is raised to $10');
 });
+
+// ── B2: burn-rate (session-average $/h, opt-in) ─────────────────────────────
+// rate = total_cost_usd / (total_duration_ms / 3.6e6). Wall-clock denominator
+// (idle time is still spend). Stateless, labeled an average. Off by default;
+// self-suppresses when cost is null or duration is 0.
+
+import { formatBurnRate } from './statusline.js';
+
+test('formatBurnRate computes session-average $/h; the plan example checks out', () => {
+  assert.equal(formatBurnRate(8.4, 6420000), '↑$4.7/h');   // $8.40 over 1h47m → 4.71
+  assert.equal(formatBurnRate(8.4, 7200000), '↑$4.2/h');   // $8.40 over 2h
+  assert.equal(formatBurnRate(100, 3600000), '↑$100/h');   // ≥10 → integer
+});
+
+test('formatBurnRate self-suppresses on null cost or zero/absent duration', () => {
+  assert.equal(formatBurnRate(null, 6420000), null);
+  assert.equal(formatBurnRate(8.4, 0), null);
+  assert.equal(formatBurnRate(8.4, null), null);
+});
+
+test('burn-rate is off by default, shown when the field is enabled', () => {
+  const [, offState] = spatialLayout(vmFull, {});
+  assert.ok(!offState.includes('/h'), 'absent by default');
+  const [, onState] = spatialLayout(vmFull, { fields: { burnRate: true } });
+  assert.ok(onState.includes('↑$4.7/h'), 'shown when enabled');
+});
+
+test('burn-rate field self-suppresses even when enabled if duration is 0', () => {
+  const vm = readPayload(JSON.stringify({ cost: { total_cost_usd: 5, total_duration_ms: 0 } }));
+  const [, state] = spatialLayout(vm, { fields: { burnRate: true } });
+  assert.ok(!state.includes('/h'));
+});
+
+test('golden: burn-rate renders through the entry when configured on', () => {
+  const cfgPath = tmpConfig({ fields: { burnRate: true } });
+  const r = spawnSync(process.execPath, [ENTRY], {
+    input: fixture('full'), encoding: 'utf8',
+    env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: cfgPath, FORCE_COLOR: '' },
+  });
+  assert.equal(r.status, 0);
+  assert.ok(r.stdout.includes('↑$4.7/h'), `burn-rate present: ${r.stdout}`);
+});

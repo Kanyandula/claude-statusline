@@ -92,6 +92,33 @@ stand out. Honors `NO_COLOR` / `FORCE_COLOR`; the installed command passes
 
 ---
 
+## Configuration
+
+Drop a `~/.claude/statusline.json` (or point `CLAUDE_STATUSLINE_CONFIG` at an
+absolute `*.json`). Defaults apply for anything you omit; unknown keys and
+wrong-typed values are ignored, so a typo can't blank the bar.
+
+```json
+{
+  "separators": "·",
+  "defaultWindowSize": 200000,
+  "maxProjectWidth": 24,
+  "thresholds": {
+    "context": { "warn": 60, "danger": 85 },
+    "cost":    { "warn": 5,  "danger": 20 }
+  },
+  "fields": {
+    "gitAheadBehind": true,
+    "burnRate": false
+  }
+}
+```
+
+- `fields.burnRate` — append a session-average burn rate (`↑$4.7/h`) after cost.
+- `fields.gitAheadBehind` — show `↑`/`↓` commit counts on the branch segment.
+
+---
+
 ## How it works
 
 Claude Code pipes a JSON object to the command on every render. `statusline.js`
