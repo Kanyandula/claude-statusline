@@ -1,0 +1,36 @@
+{
+  "cwd": "/Users/admin/projects/claude-statusline",
+  "session_id": "abc123session",
+  "transcript_path": "/path/to/transcript.jsonl",
+  "model": {
+    "id": "claude-opus-4-8",
+    "display_name": "Opus"
+  },
+  "workspace": {
+    "current_dir": "/Users/admin/projects/claude-statusline",
+    "project_dir": "/Users/admin/projects/claude-statusline"
+  },
+  "version": "2.1.132",
+  "output_style": {
+    "name": "default"
+  },
+  "cost": {
+    "total_cost_usd": 8.4,
+    "total_duration_ms": 6420000,
+    "total_api_duration_ms": 2300,
+    "total_lines_added": 342,
+    "total_lines_removed": 89
+  },
+  "context_window": {
+    "total_input_tokens": 15500,
+    "total_output_tokens": 1200,
+    "context_window_size": 200000,
+    "used_percentage": 8,
+    "remaining_percentage": 92
+  },
+  "exceeds_200k_tokens": false,
+  "rate_limits": {
+    "five_hour": { "used_percentage": 23.5, "resets_at": 1738425600 },
+    "seven_day": { "used_percentage": 41.2, "resets_at": 1738857600 }
+  }
+}
