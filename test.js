@@ -227,3 +227,80 @@ test('config.separators overrides the field separator', () => {
   assert.ok(identity.includes('|'));
   assert.ok(!identity.includes('·'));
 });
+
+// ── A3: threshold → color + health pixel ────────────────────────────────────
+// colorize(vm, config, useColour) wraps fields in ANSI by threshold band. One
+// severity mapping (green→yellow→red, dim=no-signal) drives every field AND the
+// health pixel (which takes the WORST active threshold). Defaults: context
+// 60/85, cost $5/$20.
+
+import { colorize, severity } from './statusline.js';
+
+const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+const SGR = { green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', dim: '\x1b[2m' };
+const vmOf = (o) => readPayload(JSON.stringify(o));
+
+test('severity bands: <warn green, ≥warn yellow, ≥danger red, null no-signal', () => {
+  assert.equal(severity(8, 60, 85), 0);    // green
+  assert.equal(severity(60, 60, 85), 1);   // yellow at boundary
+  assert.equal(severity(85, 60, 85), 2);   // red at boundary
+  assert.equal(severity(null, 60, 85), -1); // no signal
+});
+
+test('stripping ANSI from a colorized layout yields the exact structure layout', () => {
+  const vm = { ...vmFull, branch: 'v2' };
+  const colored = colorize(vm, {}, true);
+  const structure = spatialLayout(vm, {});
+  assert.deepEqual(colored.map(strip), structure);
+});
+
+test('useColour=false emits no escape codes (identical to structure)', () => {
+  const vm = { ...vmFull, branch: 'v2' };
+  assert.deepEqual(colorize(vm, {}, false), spatialLayout(vm, {}));
+});
+
+test('ctx field colored by band: green low, yellow ≥60, red ≥85, dim when null', () => {
+  const ctxLine = (pct) => colorize(vmOf({ context_window: { used_percentage: pct } }), {}, true)[1];
+  assert.ok(ctxLine(8).includes(SGR.green));
+  assert.ok(ctxLine(70).includes(SGR.yellow));
+  assert.ok(ctxLine(90).includes(SGR.red));
+  assert.ok(ctxLine(null).includes(SGR.dim));   // placeholder bar is dim, not red
+});
+
+test('cost field colored by band: green <$5, yellow ≥$5, red ≥$20', () => {
+  const costLine = (usd) => colorize(vmOf({ cost: { total_cost_usd: usd } }), {}, true)[1];
+  assert.ok(costLine(1).includes(SGR.green));
+  assert.ok(costLine(8).includes(SGR.yellow));
+  assert.ok(costLine(25).includes(SGR.red));
+});
+
+test('health pixel takes the worst active threshold', () => {
+  const pixel = (o) => colorize(vmOf(o), {}, true)[0];
+  // ctx green + cost red → red pixel
+  assert.ok(pixel({ context_window: { used_percentage: 8 }, cost: { total_cost_usd: 25 } }).startsWith(SGR.red));
+  // ctx yellow + cost green → yellow pixel
+  assert.ok(pixel({ context_window: { used_percentage: 70 }, cost: { total_cost_usd: 1 } }).startsWith(SGR.yellow));
+  // both green → green pixel
+  assert.ok(pixel({ context_window: { used_percentage: 8 }, cost: { total_cost_usd: 1 } }).startsWith(SGR.green));
+});
+
+test('fresh session (null ctx, null cost) → dim pixel, never red', () => {
+  const pixel = colorize(vmOf({ model: { display_name: 'Opus' } }), {}, true)[0];
+  assert.ok(pixel.startsWith(SGR.dim), 'pixel is dim with no signal');
+  assert.ok(!pixel.includes(SGR.red) && !pixel.includes(SGR.yellow));
+});
+
+test('identity fields (project/model) are not threshold-colored — only the pixel is', () => {
+  const [identity] = colorize({ ...vmFull, branch: 'v2' }, {}, true);
+  // project/branch/model appear as plain substrings (no SGR wrapping them)
+  assert.ok(identity.includes(' claude-statusline '), 'project is plain');
+  assert.ok(identity.includes('Opus'), 'model present');
+  // the only colored segment on the identity line is the leading pixel
+  assert.equal(identity.indexOf('\x1b'), 0, 'first color code is the pixel at position 0');
+  assert.equal(strip(identity).indexOf('\x1b'), -1);
+});
+
+test('custom thresholds shift the bands', () => {
+  const line = colorize(vmOf({ cost: { total_cost_usd: 8 } }), { thresholds: { cost: { warn: 10, danger: 30 } } }, true)[1];
+  assert.ok(line.includes(SGR.green), '$8 is green when warn raised to $10');
+});

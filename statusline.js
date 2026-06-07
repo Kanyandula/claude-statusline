@@ -31,6 +31,25 @@ export function stripControlChars(s) {
   return s.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
 }
 
+// ── ANSI color (ported from v1) ──────────────────────────────────────────────
+
+const SGR = { red: 31, green: 32, yellow: 33, dim: 2, bold: 1, reset: 0 };
+
+// Wrap text in an SGR escape; `style` is a CODES key or array of keys composed
+// into one sequence. Unknown/empty styles pass the text through unchanged.
+export function wrap(style, text) {
+  const codes = (Array.isArray(style) ? style : [style]).map((s) => SGR[s]).filter((c) => c !== undefined);
+  return codes.length ? `\x1b[${codes.join(';')}m${text}\x1b[0m` : text;
+}
+
+// NO_COLOR off, FORCE_COLOR on, else stdout TTY. Deployment-specific overrides
+// belong in the caller.
+export function supportsColor() {
+  if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR) return true;
+  return process.stdout && process.stdout.isTTY === true;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 // A field is a number only if it is genuinely a finite number; everything else
@@ -167,26 +186,97 @@ export function sizeLabel(size) {
 }
 
 // ── spatial layout (pure) ────────────────────────────────────────────────────
-// (viewModel, config) → string[] (one entry per line). Two lines: an identity
-// line led by the health-pixel glyph, and a state line of metric fields. Color
-// is applied later by colorize; this stays structure-only.
-export function spatialLayout(vm, config = {}) {
+// (viewModel, config, paint) → string[] (one entry per line). Two lines: an
+// identity line led by the health-pixel glyph, and a state line of metric
+// fields. `paint(role, text)` lets colorize wrap fields by threshold; the
+// default is identity, so a bare `spatialLayout(vm, config)` is structure-only
+// (no color) — the live path golden tests assert against.
+const PLAIN = (_role, text) => text;
+
+export function spatialLayout(vm, config = {}, paint = PLAIN) {
   const sep = config.separators ?? '·';
   const defaultSize = config.defaultWindowSize ?? 200000;
   const join = (parts) => parts.filter((p) => p != null && p !== '').join(` ${sep} `);
 
-  // Identity: ▌ project · branch · model [· size-when-non-default]
+  // Identity: ▌ project · branch · model [· size-when-non-default].
+  // Identity is plain text — only the pixel carries threshold color.
   const model = vm.modelName ?? vm.modelShort ?? null;
   const size =
     vm.contextWindowSize != null && vm.contextWindowSize !== defaultSize
       ? sizeLabel(vm.contextWindowSize)
       : null;
-  const identity = `▌ ${join([vm.projectName, vm.branch, model, size])}`;
+  const identity = `${paint('pixel', '▌')} ${join([
+    paint('project', vm.projectName),
+    paint('branch', vm.branch),
+    paint('model', model),
+    paint('size', size),
+  ])}`;
 
   // State: ctx <bar> <pct> · ⏱ <dur> · <cost> · <loc>
-  const ctx = `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`;
-  const dur = vm.durationMs != null ? `⏱ ${formatDuration(vm.durationMs)}` : null;
-  const state = join([ctx, dur, formatCost(vm.costUsd), formatLoc(vm.linesAdded, vm.linesRemoved)]);
+  const ctx = paint('ctx', `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`);
+  const dur = vm.durationMs != null ? paint('duration', `⏱ ${formatDuration(vm.durationMs)}`) : null;
+  const cost = paint('cost', formatCost(vm.costUsd));
+  const loc = paint('loc', formatLoc(vm.linesAdded, vm.linesRemoved));
+  const state = join([ctx, dur, cost, loc]);
 
   return [identity, state];
+}
+
+// ── threshold → color (A3) ───────────────────────────────────────────────────
+// One severity mapping drives every threshold field and the health pixel.
+
+export const DEFAULT_THRESHOLDS = {
+  context: { warn: 60, danger: 85 },
+  cost: { warn: 5, danger: 20 },
+};
+
+function resolveThresholds(config) {
+  const t = config.thresholds || {};
+  return {
+    context: { ...DEFAULT_THRESHOLDS.context, ...t.context },
+    cost: { ...DEFAULT_THRESHOLDS.cost, ...t.cost },
+  };
+}
+
+// -1 no-signal (null), 0 green, 1 yellow (≥warn), 2 red (≥danger).
+export function severity(value, warn, danger) {
+  if (value == null) return -1;
+  if (value >= danger) return 2;
+  if (value >= warn) return 1;
+  return 0;
+}
+
+const SEV_COLOR = { '-1': 'dim', 0: 'green', 1: 'yellow', 2: 'red' };
+
+// Worst (highest) severity among the present signals; -1 if none present, so a
+// fresh session shows a dim pixel rather than flashing red.
+function worstSeverity(severities) {
+  const present = severities.filter((s) => s >= 0);
+  return present.length ? Math.max(...present) : -1;
+}
+
+// Build the painter colorize injects into spatialLayout. Threshold roles (ctx,
+// cost, pixel) get a band color; identity/metric roles pass through plain.
+function makePainter(vm, config, useColour) {
+  const t = resolveThresholds(config);
+  const ctxSev = severity(vm.ctxPct, t.context.warn, t.context.danger);
+  const costSev = severity(vm.costUsd, t.cost.warn, t.cost.danger);
+  const colorByRole = {
+    pixel: SEV_COLOR[worstSeverity([ctxSev, costSev])],
+    ctx: SEV_COLOR[ctxSev],
+    cost: SEV_COLOR[costSev],
+  };
+  const w = useColour ? wrap : PLAIN;
+  return (role, text) => {
+    if (text == null) return text;
+    const clr = colorByRole[role];
+    return clr ? w(clr, text) : text;
+  };
+}
+
+// colorize(vm, config, useColour) → string[]. The same two lines as
+// spatialLayout, with threshold color applied. Stripping the ANSI yields the
+// exact structure layout (golden-test invariant).
+export function colorize(vm, config = {}, useColour = supportsColor()) {
+  return spatialLayout(vm, config, makePainter(vm, config, useColour));
 }
