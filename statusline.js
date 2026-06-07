@@ -208,60 +208,90 @@ export function sizeLabel(size) {
   return String(size);
 }
 
-// ── spatial layout (pure) ────────────────────────────────────────────────────
-// (viewModel, config, paint) → string[] (one entry per line). Two lines: an
-// identity line led by the health-pixel glyph, and a state line of metric
-// fields. `paint(role, text)` lets colorize wrap fields by threshold; the
-// default is identity, so a bare `spatialLayout(vm, config)` is structure-only
-// (no color) — the live path golden tests assert against.
+// ── layouts (pure) ───────────────────────────────────────────────────────────
+// (viewModel, config, paint) → string[] (one entry per line). `paint(role,
+// text)` lets colorize wrap fields by threshold; the default is identity, so a
+// bare `…Layout(vm, config)` is structure-only — the live path golden tests
+// assert against. spatial/compact/zen are ARRANGEMENTS over one field source
+// (rawFields), not separate render code paths.
 const PLAIN = (_role, text) => text;
 
-export function spatialLayout(vm, config = {}, paint = PLAIN) {
-  const sep = config.separators ?? '·';
+// The single source of every field's raw (unpainted) text, keyed by role.
+// Layouts only choose which roles to show and how to group them into lines.
+function rawFields(vm, config) {
   const defaultSize = config.defaultWindowSize ?? 200000;
-
-  // Assemble a line from [role, text] pairs: drop empties, strip the terminal
-  // field's trailing fixed-width pad (alignment only matters between fields, so
-  // it would just be junk whitespace at line-end), then paint and join. Trimming
-  // before paint keeps plain and colored output identical under ANSI-strip.
-  const assemble = (pairs) => {
-    const present = pairs.filter((p) => p && p[1] != null && p[1] !== '');
-    if (present.length) {
-      const last = present[present.length - 1];
-      present[present.length - 1] = [last[0], last[1].replace(/\s+$/, '')];
-    }
-    return present.map(([role, text]) => paint(role, text)).join(` ${sep} `);
-  };
-
-  // Identity: ▌ project · branch · model [· size-when-non-default].
-  // Identity is plain text — only the pixel carries threshold color.
-  const model = vm.modelName ?? vm.modelShort ?? null;
-  const project = vm.projectName != null ? truncate(vm.projectName, config.maxProjectWidth ?? 24) : null;
   const size =
     vm.contextWindowSize != null && vm.contextWindowSize !== defaultSize
       ? sizeLabel(vm.contextWindowSize)
       : null;
-  const idBody = assemble([
-    ['project', project],
-    ['branch', branchLabel(vm, { aheadBehind: config.fields?.gitAheadBehind ?? true })],
-    ['model', model],
-    ['size', size],
-  ]);
+  return {
+    project: vm.projectName != null ? truncate(vm.projectName, config.maxProjectWidth ?? 24) : null,
+    branch: branchLabel(vm, { aheadBehind: config.fields?.gitAheadBehind ?? true }),
+    model: vm.modelName ?? vm.modelShort ?? null,
+    size,
+    ctx: `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`,
+    ctxPct: pctLabel(vm.ctxPct).trim(), // bare "NN%" for zen
+    duration: vm.durationMs != null ? `⏱ ${formatDuration(vm.durationMs)}` : null,
+    cost: formatCost(vm.costUsd),
+    burn: config.fields?.burnRate ? formatBurnRate(vm.costUsd, vm.durationMs) : null,
+    loc: formatLoc(vm.linesAdded, vm.linesRemoved),
+  };
+}
+
+// Assemble one line from [role, text] pairs: drop empties, strip the terminal
+// field's trailing fixed-width pad (alignment only matters between fields, so it
+// would just be junk whitespace at line-end), then paint and join. Trimming
+// before paint keeps plain and colored output identical under ANSI-strip.
+function assembleLine(pairs, sep, paint) {
+  const present = pairs.filter((p) => p && p[1] != null && p[1] !== '');
+  if (present.length) {
+    const last = present[present.length - 1];
+    present[present.length - 1] = [last[0], last[1].replace(/\s+$/, '')];
+  }
+  return present.map(([role, text]) => paint(role, text)).join(` ${sep} `);
+}
+
+// Prefix a body with the (painted) health pixel, or just the pixel if empty.
+const withPixel = (body, paint) => {
   const pixel = paint('pixel', '▌');
-  const identity = idBody ? `${pixel} ${idBody}` : pixel;
+  return body ? `${pixel} ${body}` : pixel;
+};
 
-  // State: ctx <bar> <pct> · ⏱ <dur> · <cost> [· <burn>] · <loc>. ctx is always
-  // present; burn-rate only when the field is enabled and computable.
-  const burn = config.fields?.burnRate ? formatBurnRate(vm.costUsd, vm.durationMs) : null;
-  const state = assemble([
-    ['ctx', `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`],
-    vm.durationMs != null ? ['duration', `⏱ ${formatDuration(vm.durationMs)}`] : null,
-    ['cost', formatCost(vm.costUsd)],
-    ['burn', burn],
-    ['loc', formatLoc(vm.linesAdded, vm.linesRemoved)],
-  ]);
-
+// spatial (default): two lines — identity, then state.
+export function spatialLayout(vm, config = {}, paint = PLAIN) {
+  const sep = config.separators ?? '·';
+  const f = rawFields(vm, config);
+  const identity = withPixel(
+    assembleLine([['project', f.project], ['branch', f.branch], ['model', f.model], ['size', f.size]], sep, paint),
+    paint,
+  );
+  const state = assembleLine(
+    [['ctx', f.ctx], ['duration', f.duration], ['cost', f.cost], ['burn', f.burn], ['loc', f.loc]],
+    sep, paint,
+  );
   return [identity, state];
+}
+
+// compact: the same fields, on one line.
+export function compactLayout(vm, config = {}, paint = PLAIN) {
+  const sep = config.separators ?? '·';
+  const f = rawFields(vm, config);
+  const body = assembleLine([
+    ['project', f.project], ['branch', f.branch], ['model', f.model], ['size', f.size],
+    ['ctx', f.ctx], ['duration', f.duration], ['cost', f.cost], ['burn', f.burn], ['loc', f.loc],
+  ], sep, paint);
+  return [withPixel(body, paint)];
+}
+
+// zen: project · model · ctx% · cost. Color is the only escalation signal —
+// no bar, branch, duration, or loc.
+export function zenLayout(vm, config = {}, paint = PLAIN) {
+  const sep = config.separators ?? '·';
+  const f = rawFields(vm, config);
+  const body = assembleLine([
+    ['project', f.project], ['model', f.model], ['ctx', f.ctxPct], ['cost', f.cost],
+  ], sep, paint);
+  return [withPixel(body, paint)];
 }
 
 // ── threshold → color (A3) ───────────────────────────────────────────────────
@@ -318,7 +348,7 @@ function makePainter(vm, config, useColour) {
 
 // Layout registry — config.layout selects one; spatial is the only one shipped
 // (compact/zen/powerline land in later phases). Unknown ⇒ spatial.
-const LAYOUTS = { spatial: spatialLayout };
+const LAYOUTS = { spatial: spatialLayout, compact: compactLayout, zen: zenLayout };
 export const IMPLEMENTED_LAYOUTS = Object.keys(LAYOUTS);
 function layoutFor(config) {
   return LAYOUTS[config?.layout] ?? spatialLayout;

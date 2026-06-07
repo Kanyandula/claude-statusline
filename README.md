@@ -100,6 +100,7 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 
 ```json
 {
+  "layout": "spatial",
   "separators": "·",
   "defaultWindowSize": 200000,
   "maxProjectWidth": 24,
@@ -114,6 +115,8 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 }
 ```
 
+- `layout` — `spatial` (default, two lines), `compact` (one line, same fields),
+  or `zen` (`project · model · ctx% · cost`, where color is the only signal).
 - `fields.burnRate` — append a session-average burn rate (`↑$4.7/h`) after cost.
 - `fields.gitAheadBehind` — show `↑`/`↓` commit counts on the branch segment.
 

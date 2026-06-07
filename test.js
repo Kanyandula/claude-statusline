@@ -690,3 +690,68 @@ test('golden: burn-rate renders through the entry when configured on', () => {
   assert.equal(r.status, 0);
   assert.ok(r.stdout.includes('↑$4.7/h'), `burn-rate present: ${r.stdout}`);
 });
+
+// ── B1: compact / zen layouts ───────────────────────────────────────────────
+// Arrangements over one shared field source — not separate render code paths.
+// compact = spatial's fields on one line; zen = project · model · ctx% · cost,
+// color as the only escalation signal.
+
+import { compactLayout, zenLayout } from './statusline.js';
+
+const stripAll = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+
+test('compact: one line carrying the spatial fields', () => {
+  const lines = compactLayout({ ...vmFull, branch: 'v2' });
+  assert.equal(lines.length, 1);
+  const l = lines[0];
+  assert.ok(l.startsWith('▌ '));
+  for (const s of ['claude-statusline', 'v2', 'Opus', 'ctx ', '8%', '1h47m', '$8.40', '+342 / −89']) {
+    assert.ok(l.includes(s), `compact includes ${s}`);
+  }
+});
+
+test('zen: project · model · ctx% · cost only — no bar, branch, duration, or loc', () => {
+  const lines = zenLayout({ ...vmFull, branch: 'v2' });
+  assert.equal(lines.length, 1);
+  const l = lines[0];
+  assert.ok(l.includes('claude-statusline') && l.includes('Opus') && l.includes('8%') && l.includes('$8.40'));
+  assert.ok(!l.includes('▰') && !l.includes('ctx '), 'no context bar');
+  assert.ok(!l.includes('1h47m') && !l.includes('+342'), 'no duration/loc');
+  assert.ok(!l.includes('v2'), 'no branch in zen');
+});
+
+test('colorize dispatches on config.layout', () => {
+  assert.equal(colorize(vmFull, { layout: 'compact' }, false).length, 1);
+  assert.equal(colorize(vmFull, { layout: 'zen' }, false).length, 1);
+  assert.equal(colorize(vmFull, { layout: 'spatial' }, false).length, 2);
+  assert.equal(colorize(vmFull, {}, false).length, 2);                    // default spatial
+});
+
+test('compact and zen are accepted as configured layouts', () => {
+  assert.equal(loadConfig({ userPath: tmpConfig({ layout: 'compact' }), env: {} }).layout, 'compact');
+  assert.equal(loadConfig({ userPath: tmpConfig({ layout: 'zen' }), env: {} }).layout, 'zen');
+});
+
+test('strip-to-structure invariant holds for compact and zen too', () => {
+  for (const layout of ['compact', 'zen']) {
+    const vm = { ...vmFull, branch: 'v2' };
+    const colored = colorize(vm, { layout }, true);
+    const structure = colorize(vm, { layout }, false);
+    assert.deepEqual(colored.map(stripAll), structure, `${layout} strips to structure`);
+  }
+});
+
+test('zen pixel still reflects the worst threshold (color is the signal)', () => {
+  const vm = vmOf({ context_window: { used_percentage: 90 }, cost: { total_cost_usd: 1 } });
+  assert.ok(colorize(vm, { layout: 'zen' }, true)[0].startsWith('\x1b[31m'), 'red pixel at 90% ctx');
+});
+
+test('golden: layout=compact renders a single line through the entry', () => {
+  const cfgPath = tmpConfig({ layout: 'compact' });
+  const r = spawnSync(process.execPath, [ENTRY], {
+    input: fixture('full'), encoding: 'utf8',
+    env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: cfgPath, FORCE_COLOR: '' },
+  });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout.replace(/\n$/, '').split('\n').length, 1);
+});
