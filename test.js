@@ -755,3 +755,63 @@ test('golden: layout=compact renders a single line through the entry', () => {
   assert.equal(r.status, 0);
   assert.equal(r.stdout.replace(/\n$/, '').split('\n').length, 1);
 });
+
+// ── Theme / vivid palette (opt-in, matches the design mock) ──────────────────
+// Default 'minimal' = current ANSI behavior (identity plain, only ctx/cost/pixel
+// threshold-colored). 'vivid' = the mock: truecolor hex, colored identity, split
+// green/red LOC, purple-calm→red brand pixel. Both keep the strip→structure
+// invariant.
+
+import { wrap } from './statusline.js';
+
+test('wrap supports truecolor hex and still supports ANSI names', () => {
+  assert.equal(wrap('#bc8cff', 'x'), '\x1b[38;2;188;140;255mx\x1b[0m');
+  assert.equal(wrap('green', 'x'), '\x1b[32mx\x1b[0m');               // unchanged
+  assert.equal(wrap(['bold', '#ff7bd5'], 'x'), '\x1b[1;38;2;255;123;213mx\x1b[0m');
+});
+
+test('vivid colors the identity (pink project, blue model) — minimal leaves it plain', () => {
+  const [vividId] = colorize(vmFull, { theme: 'vivid' }, true);
+  assert.ok(vividId.includes('\x1b[1;38;2;255;123;213m'), 'project pink+bold');
+  assert.ok(vividId.includes('38;2;88;166;255'), 'model blue');
+  const [minId] = colorize(vmFull, {}, true);
+  assert.ok(minId.includes(' claude-statusline '), 'minimal project stays plain');
+});
+
+test('vivid pixel is calm purple until danger, then red', () => {
+  const calm = colorize(vmOf({ context_window: { used_percentage: 62 }, cost: { total_cost_usd: 8 } }), { theme: 'vivid' }, true)[0];
+  assert.ok(calm.startsWith('\x1b[38;2;188;140;255m▌'), 'purple at warn band');
+  const danger = colorize(vmOf({ context_window: { used_percentage: 94 } }), { theme: 'vivid' }, true)[0];
+  assert.ok(danger.startsWith('\x1b[38;2;248;81;73m▌'), 'red at danger');
+});
+
+test('vivid splits LOC into green added / red removed', () => {
+  const [, state] = colorize(vmFull, { theme: 'vivid' }, true);
+  assert.ok(state.includes('38;2;63;185;80'), 'added green');
+  assert.ok(state.includes('38;2;248;81;73'), 'removed red');
+});
+
+test('strip-to-structure invariant holds for vivid', () => {
+  const vm = { ...vmFull, branch: 'v2' };
+  for (const layout of ['spatial', 'compact', 'zen']) {
+    const colored = colorize(vm, { theme: 'vivid', layout }, true);
+    const structure = colorize(vm, { theme: 'vivid', layout }, false);
+    assert.deepEqual(colored.map((s) => s.replace(/\x1b\[[0-9;]*m/g, '')), structure);
+  }
+});
+
+test('config selects the theme; unknown theme falls back to minimal', () => {
+  assert.equal(loadConfig({ userPath: tmpConfig({ theme: 'vivid' }), env: {} }).theme, 'vivid');
+  assert.equal(loadConfig({ userPath: tmpConfig({ theme: 'neon' }), env: {} }).theme, 'minimal');
+  assert.equal(loadConfig({ userPath: '/nonexistent.json', env: {} }).theme, 'minimal');
+});
+
+test('golden: theme=vivid emits truecolor through the entry', () => {
+  const cfgPath = tmpConfig({ theme: 'vivid' });
+  const r = spawnSync(process.execPath, [ENTRY, '--color'], {
+    input: fixture('full'), encoding: 'utf8',
+    env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: cfgPath, FORCE_COLOR: '' },
+  });
+  assert.equal(r.status, 0);
+  assert.ok(/\x1b\[38;2;/.test(r.stdout), 'truecolor present');
+});

@@ -101,6 +101,7 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 ```json
 {
   "layout": "spatial",
+  "theme": "minimal",
   "separators": "·",
   "defaultWindowSize": 200000,
   "maxProjectWidth": 24,
@@ -117,6 +118,10 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 
 - `layout` — `spatial` (default, two lines), `compact` (one line, same fields),
   or `zen` (`project · model · ctx% · cost`, where color is the only signal).
+- `theme` — `minimal` (default: your terminal's ANSI palette, identity plain,
+  only context/cost/pixel colored) or `vivid` (the design-mock palette —
+  truecolor, colored identity, split green/red LOC, a calm purple pixel that
+  turns red only in the danger band). `vivid` needs a truecolor terminal.
 - `fields.burnRate` — append a session-average burn rate (`↑$4.7/h`) after cost.
 - `fields.gitAheadBehind` — show `↑`/`↓` commit counts on the branch segment.
 

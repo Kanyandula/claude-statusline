@@ -182,6 +182,23 @@ The v1 failure mode this plan exists to prevent: tests that pass without renderi
 
 ---
 
+## Themes (the deferred `colors` key, realized 2026-06-08)
+
+The plan's `colors` config key landed as named **themes** (color still derived,
+never hand-set per field — consistent with the locked rule):
+
+- `minimal` (default) — the original thesis: identity plain, only ctx/cost/pixel
+  threshold-colored, terminal ANSI palette.
+- `vivid` — the original design-mock palette (`claude_statusline_design_directions.html`):
+  truecolor hex, colored identity (pink project, blue model, dim branch/duration),
+  split green/red LOC, and a calm purple pixel that turns red only in the danger
+  band. Needs a truecolor terminal. Opt-in via `theme: "vivid"`.
+
+Mock-direction coverage: **A spatial** ✅, **B burn-rate** ✅ (opt-in field, not a
+separate layout), **D zen** ✅, **C powerline** ❌ — still the one unbuilt
+direction (Phase C `C0`, Nerd-Font-gated). `vivid` reproduces the mock's palette
+for A/B/D.
+
 ## Out of scope (v2)
 
 Plan/sandbox indicators (not in stdin), network calls of any kind, a TUI/dashboard mode, per-turn token graphing, theme marketplace, rolling/"current" burn-rate (requires a state file — Phase C at the earliest).

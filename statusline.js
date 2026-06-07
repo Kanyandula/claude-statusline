@@ -39,10 +39,20 @@ export function stripControlChars(s) {
 
 const SGR = { red: 31, green: 32, yellow: 33, dim: 2, bold: 1, reset: 0 };
 
-// Wrap text in an SGR escape; `style` is a CODES key or array of keys composed
+// Resolve one style token to SGR parameter strings: a named ANSI code
+// ('green'), a raw number, or a truecolor hex ('#rrggbb' → 38;2;r;g;b).
+function sgrParams(token) {
+  if (typeof token === 'number') return [String(token)];
+  if (typeof token === 'string' && /^#[0-9a-f]{6}$/i.test(token)) {
+    return ['38', '2', String(parseInt(token.slice(1, 3), 16)), String(parseInt(token.slice(3, 5), 16)), String(parseInt(token.slice(5, 7), 16))];
+  }
+  return SGR[token] !== undefined ? [String(SGR[token])] : [];
+}
+
+// Wrap text in an SGR escape; `style` is a token or array of tokens composed
 // into one sequence. Unknown/empty styles pass the text through unchanged.
 export function wrap(style, text) {
-  const codes = (Array.isArray(style) ? style : [style]).map((s) => SGR[s]).filter((c) => c !== undefined);
+  const codes = (Array.isArray(style) ? style : [style]).flatMap(sgrParams);
   return codes.length ? `\x1b[${codes.join(';')}m${text}\x1b[0m` : text;
 }
 
@@ -327,23 +337,57 @@ function worstSeverity(severities) {
   return present.length ? Math.max(...present) : -1;
 }
 
-// Build the painter colorize injects into spatialLayout. Threshold roles (ctx,
-// cost, pixel) get a band color; identity/metric roles pass through plain.
-function makePainter(vm, config, useColour) {
-  const t = resolveThresholds(config);
-  const ctxSev = severity(vm.ctxPct, t.context.warn, t.context.danger);
-  const costSev = severity(vm.costUsd, t.cost.warn, t.cost.danger);
-  const colorByRole = {
-    pixel: SEV_COLOR[worstSeverity([ctxSev, costSev])],
-    ctx: SEV_COLOR[ctxSev],
-    cost: SEV_COLOR[costSev],
-  };
-  const w = useColour ? wrap : PLAIN;
-  return (role, text) => {
-    if (text == null) return text;
-    const clr = colorByRole[role];
+// ── themes ───────────────────────────────────────────────────────────────────
+// A theme is `paint(role, text, sev, w)` → painted string. minimal keeps the
+// terminal's ANSI palette and only colors the threshold roles (identity plain).
+// vivid is the design-mock palette: truecolor hex, colored identity, split LOC,
+// and a calm purple pixel that only turns red in the danger band.
+
+const HEX = {
+  purple: '#bc8cff', pink: '#ff7bd5', blue: '#58a6ff', gray: '#6e7681',
+  amber: '#d29922', green: '#3fb950', red: '#f85149',
+};
+
+const vividSev = (s) => (s === 2 ? HEX.red : s === 1 ? HEX.amber : s === 0 ? HEX.green : HEX.gray);
+
+// Split "+added / −removed" into green / dim / red without changing any
+// character (so ANSI-strip still yields the structure text).
+function vividLoc(text, w) {
+  const m = text.match(/^(\+\d+)( \/ )(−\d+)$/);
+  return m ? w(HEX.green, m[1]) + w(HEX.gray, m[2]) + w(HEX.red, m[3]) : w(HEX.gray, text);
+}
+
+const THEMES = {
+  minimal: (role, text, sev, w) => {
+    const clr = { pixel: SEV_COLOR[sev.pixel], ctx: SEV_COLOR[sev.ctx], cost: SEV_COLOR[sev.cost] }[role];
     return clr ? w(clr, text) : text;
-  };
+  },
+  vivid: (role, text, sev, w) => {
+    switch (role) {
+      case 'pixel': return w(sev.pixel >= 2 ? HEX.red : HEX.purple, text);
+      case 'project': return w(['bold', HEX.pink], text);
+      case 'branch': return w(HEX.gray, text);
+      case 'model': case 'size': return w(HEX.blue, text);
+      case 'duration': case 'burn': return w(HEX.gray, text);
+      case 'ctx': return w(vividSev(sev.ctx), text);
+      case 'cost': return w(vividSev(sev.cost), text);
+      case 'loc': return vividLoc(text, w);
+      default: return text;
+    }
+  },
+};
+export const KNOWN_THEMES = Object.keys(THEMES);
+
+// Build the painter colorize injects into the layout. Computes the severity of
+// each threshold role once and delegates per-role coloring to the theme.
+function makePainter(vm, config, useColour) {
+  const theme = THEMES[config?.theme] ?? THEMES.minimal;
+  const t = resolveThresholds(config);
+  const ctx = severity(vm.ctxPct, t.context.warn, t.context.danger);
+  const cost = severity(vm.costUsd, t.cost.warn, t.cost.danger);
+  const sev = { ctx, cost, pixel: worstSeverity([ctx, cost]) };
+  const w = useColour ? wrap : PLAIN;
+  return (role, text) => (text == null ? text : theme(role, text, sev, w));
 }
 
 // Layout registry — config.layout selects one; spatial is the only one shipped
@@ -368,6 +412,7 @@ export function colorize(vm, config = {}, useColour = supportsColor()) {
 
 export const DEFAULT_CONFIG = {
   layout: 'spatial',
+  theme: 'minimal',
   separators: '·',
   defaultWindowSize: 200000,
   maxProjectWidth: 24,
@@ -444,6 +489,7 @@ function normalizeConfig(cfg) {
   const mpw = finiteNum(s.maxProjectWidth, DEFAULT_CONFIG.maxProjectWidth);
   return {
     layout: IMPLEMENTED_LAYOUTS.includes(s.layout) ? s.layout : DEFAULT_CONFIG.layout,
+    theme: KNOWN_THEMES.includes(s.theme) ? s.theme : DEFAULT_CONFIG.theme,
     separators: typeof s.separators === 'string' && s.separators ? s.separators : DEFAULT_CONFIG.separators,
     defaultWindowSize: finiteNum(s.defaultWindowSize, DEFAULT_CONFIG.defaultWindowSize),
     maxProjectWidth: mpw > 0 ? Math.floor(mpw) : DEFAULT_CONFIG.maxProjectWidth,
