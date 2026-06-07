@@ -304,3 +304,78 @@ test('custom thresholds shift the bands', () => {
   const line = colorize(vmOf({ cost: { total_cost_usd: 8 } }), { thresholds: { cost: { warn: 10, danger: 30 } } }, true)[1];
   assert.ok(line.includes(SGR.green), '$8 is green when warn raised to $10');
 });
+
+// ── A4: golden tests through the real entry point ───────────────────────────
+// Pipe stdin through the actual statusline.js process — the live path, not a
+// mocked render. Structure asserted with color off (piped stdout → no TTY →
+// no color); threshold transitions asserted with FORCE_COLOR on.
+
+import { spawnSync } from 'node:child_process';
+
+const ENTRY = join(HERE, 'statusline.js');
+function runEntry(input, { color = false } = {}) {
+  const env = { ...process.env, NO_COLOR: '', FORCE_COLOR: color ? '1' : '' };
+  if (!color) delete env.FORCE_COLOR;
+  const r = spawnSync(process.execPath, [ENTRY], { input, encoding: 'utf8', env });
+  assert.equal(r.status, 0, `entry exited ${r.status}: ${r.stderr}`);
+  return r.stdout.replace(/\n$/, '');
+}
+const pipe = (obj, opts) => runEntry(JSON.stringify(obj), opts);
+
+test('golden: full fixture → exact spatial structure (color off)', () => {
+  const out = runEntry(fixture('full'));
+  assert.deepEqual(out.split('\n'), [
+    '▌ claude-statusline · Opus',
+    'ctx ▰▱▱▱▱▱▱▱▱▱ 8%   · ⏱ 1h47m · $8.40   · +342 / −89',
+  ]);
+});
+
+test('golden: full fixture color-on strips back to the exact structure', () => {
+  const plain = runEntry(fixture('full'));
+  const colored = runEntry(fixture('full'), { color: true });
+  assert.notEqual(colored, plain, 'color actually applied');
+  assert.equal(colored.replace(/\x1b\[[0-9;]*m/g, ''), plain);
+  // cost $8.40 (yellow) is the worst band → yellow pixel
+  assert.ok(colored.startsWith('\x1b[33m▌'));
+});
+
+test('golden: empty payload → pixel + placeholder bar, no stray fields', () => {
+  assert.deepEqual(pipe({}).split('\n'), ['▌', 'ctx ▱▱▱▱▱▱▱▱▱▱ --%']);
+});
+
+test('golden: ctx band transitions at 59/60/84/85 (color on)', () => {
+  const band = (pct) => pipe({ context_window: { used_percentage: pct } }, { color: true }).split('\n')[1];
+  assert.ok(band(59).includes('\x1b[32m'), '59 green');
+  assert.ok(band(60).includes('\x1b[33m'), '60 yellow');
+  assert.ok(band(84).includes('\x1b[33m'), '84 yellow');
+  assert.ok(band(85).includes('\x1b[31m'), '85 red');
+});
+
+test('golden: cost band transitions at $4.99/$5/$19.99/$20 (color on)', () => {
+  const band = (usd) => pipe({ cost: { total_cost_usd: usd } }, { color: true }).split('\n')[1];
+  assert.ok(band(4.99).includes('\x1b[32m'), '$4.99 green');
+  assert.ok(band(5).includes('\x1b[33m'), '$5 yellow');
+  assert.ok(band(19.99).includes('\x1b[33m'), '$19.99 yellow');
+  assert.ok(band(20).includes('\x1b[31m'), '$20 red');
+});
+
+test('golden: non-default (1M) window shows the size label', () => {
+  const id = pipe({ workspace: { current_dir: '/x/proj' }, model: { display_name: 'Opus' }, context_window: { context_window_size: 1000000 } }).split('\n')[0];
+  assert.ok(id.includes('· 1M'));
+});
+
+test('golden: over-long project name is truncated with an ellipsis', () => {
+  const longName = 'a-really-very-extremely-long-project-directory-name';
+  const id = pipe({ workspace: { current_dir: `/x/${longName}` } }).split('\n')[0];
+  assert.ok(id.includes('…'), 'truncated with ellipsis');
+  assert.ok(!id.includes(longName), 'full name not shown');
+});
+
+test('golden: zero cost / zero duration renders without crashing', () => {
+  const out = pipe({ cost: { total_cost_usd: 0, total_duration_ms: 0, total_lines_added: 0, total_lines_removed: 0 } });
+  assert.ok(out.split('\n')[1].includes('$0.00'));
+});
+
+test('golden: malformed stdin still emits a valid (empty) bar, exit 0', () => {
+  assert.deepEqual(runEntry('not json at all').split('\n'), ['▌', 'ctx ▱▱▱▱▱▱▱▱▱▱ --%']);
+});

@@ -5,6 +5,7 @@
 // the adapter + view-model; layout/colorize/emit land in later A-tasks.
 
 import { basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // ── stdin parsing ────────────────────────────────────────────────────────────
 
@@ -177,6 +178,14 @@ export function formatLoc(added, removed) {
   return `+${added ?? 0} / −${removed ?? 0}`;
 }
 
+// Truncate an over-long string with a trailing ellipsis so the identity line
+// can't blow out the terminal width. max counts the visible characters,
+// ellipsis included.
+export function truncate(s, max) {
+  if (typeof s !== 'string' || s.length <= max) return s;
+  return s.slice(0, Math.max(0, max - 1)) + '…';
+}
+
 // Humanize a context-window size: 1000000 → "1M", 200000 → "200K".
 export function sizeLabel(size) {
   if (size == null) return null;
@@ -196,28 +205,44 @@ const PLAIN = (_role, text) => text;
 export function spatialLayout(vm, config = {}, paint = PLAIN) {
   const sep = config.separators ?? '·';
   const defaultSize = config.defaultWindowSize ?? 200000;
-  const join = (parts) => parts.filter((p) => p != null && p !== '').join(` ${sep} `);
+
+  // Assemble a line from [role, text] pairs: drop empties, strip the terminal
+  // field's trailing fixed-width pad (alignment only matters between fields, so
+  // it would just be junk whitespace at line-end), then paint and join. Trimming
+  // before paint keeps plain and colored output identical under ANSI-strip.
+  const assemble = (pairs) => {
+    const present = pairs.filter((p) => p && p[1] != null && p[1] !== '');
+    if (present.length) {
+      const last = present[present.length - 1];
+      present[present.length - 1] = [last[0], last[1].replace(/\s+$/, '')];
+    }
+    return present.map(([role, text]) => paint(role, text)).join(` ${sep} `);
+  };
 
   // Identity: ▌ project · branch · model [· size-when-non-default].
   // Identity is plain text — only the pixel carries threshold color.
   const model = vm.modelName ?? vm.modelShort ?? null;
+  const project = vm.projectName != null ? truncate(vm.projectName, config.maxProjectWidth ?? 24) : null;
   const size =
     vm.contextWindowSize != null && vm.contextWindowSize !== defaultSize
       ? sizeLabel(vm.contextWindowSize)
       : null;
-  const identity = `${paint('pixel', '▌')} ${join([
-    paint('project', vm.projectName),
-    paint('branch', vm.branch),
-    paint('model', model),
-    paint('size', size),
-  ])}`;
+  const idBody = assemble([
+    ['project', project],
+    ['branch', vm.branch],
+    ['model', model],
+    ['size', size],
+  ]);
+  const pixel = paint('pixel', '▌');
+  const identity = idBody ? `${pixel} ${idBody}` : pixel;
 
-  // State: ctx <bar> <pct> · ⏱ <dur> · <cost> · <loc>
-  const ctx = paint('ctx', `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`);
-  const dur = vm.durationMs != null ? paint('duration', `⏱ ${formatDuration(vm.durationMs)}`) : null;
-  const cost = paint('cost', formatCost(vm.costUsd));
-  const loc = paint('loc', formatLoc(vm.linesAdded, vm.linesRemoved));
-  const state = join([ctx, dur, cost, loc]);
+  // State: ctx <bar> <pct> · ⏱ <dur> · <cost> · <loc>. ctx is always present.
+  const state = assemble([
+    ['ctx', `ctx ${contextBar(vm.ctxPct)} ${pctLabel(vm.ctxPct)}`],
+    vm.durationMs != null ? ['duration', `⏱ ${formatDuration(vm.durationMs)}`] : null,
+    ['cost', formatCost(vm.costUsd)],
+    ['loc', formatLoc(vm.linesAdded, vm.linesRemoved)],
+  ]);
 
   return [identity, state];
 }
@@ -279,4 +304,39 @@ function makePainter(vm, config, useColour) {
 // exact structure layout (golden-test invariant).
 export function colorize(vm, config = {}, useColour = supportsColor()) {
   return spatialLayout(vm, config, makePainter(vm, config, useColour));
+}
+
+// ── entry (emit) ─────────────────────────────────────────────────────────────
+
+// render raw stdin to the final multi-line string. Config loading lands in B5;
+// for now the defaults drive everything.
+export function renderLine(raw, { config = {}, useColour } = {}) {
+  return colorize(readPayload(raw), config, useColour ?? supportsColor()).join('\n');
+}
+
+// Statusline payloads are tiny; cap stdin at 1 MB so a wedged upstream pipe
+// can't make us buffer unboundedly.
+const MAX_STDIN = 1024 * 1024;
+
+function readStdin() {
+  return new Promise((resolve) => {
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk) => {
+      if (data.length < MAX_STDIN) data += chunk;
+    });
+    process.stdin.on('end', () => resolve(data.slice(0, MAX_STDIN)));
+    process.stdin.on('error', () => resolve(data.slice(0, MAX_STDIN)));
+  });
+}
+
+async function main() {
+  process.stdout.write(renderLine(await readStdin()) + '\n');
+}
+
+// Run only when executed directly (`node statusline.js`), never when imported by
+// tests. EPIPE: the terminal can close our pipe mid-write — exit quietly.
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  process.stdout.on('error', (e) => { if (e.code === 'EPIPE') process.exit(0); });
+  main();
 }
