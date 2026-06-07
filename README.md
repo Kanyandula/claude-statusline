@@ -117,7 +117,9 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 ```
 
 - `layout` — `spatial` (default, two lines), `compact` (one line, same fields),
-  or `zen` (`project · model · ctx% · cost`, where color is the only signal).
+  `zen` (`project · model · ctx% · cost`, where color is the only signal), or
+  `powerline` (one line of background-filled segments — **needs a Nerd Font**,
+  or the arrow glyphs render as tofu).
 - `theme` — `minimal` (default: your terminal's ANSI palette, identity plain,
   only context/cost/pixel colored) or `vivid` (the design-mock palette —
   truecolor, colored identity, split green/red LOC, a calm purple pixel that

@@ -195,9 +195,10 @@ never hand-set per field — consistent with the locked rule):
   band. Needs a truecolor terminal. Opt-in via `theme: "vivid"`.
 
 Mock-direction coverage: **A spatial** ✅, **B burn-rate** ✅ (opt-in field, not a
-separate layout), **D zen** ✅, **C powerline** ❌ — still the one unbuilt
-direction (Phase C `C0`, Nerd-Font-gated). `vivid` reproduces the mock's palette
-for A/B/D.
+separate layout), **D zen** ✅, **C powerline** ✅ (2026-06-08 — `layout:
+"powerline"`, truecolor background segments + arrow glyphs, Nerd-Font-gated,
+distinct render path from the painter). `vivid` reproduces the mock palette for
+A/B/D. **All four mock directions are now covered.**
 
 ## Out of scope (v2)
 

@@ -304,6 +304,49 @@ export function zenLayout(vm, config = {}, paint = PLAIN) {
   return [withPixel(body, paint)];
 }
 
+// powerline (opt-in, needs a Nerd Font): one line of background-filled segments
+// joined by the powerline arrow . A distinct render path — it uses background
+// color and transition arrows rather than the foreground role-painter, so it
+// bypasses the theme system. Strips to a stable structure (same glyphs, color
+// removed). Without a Nerd Font the arrows render as tofu — hence opt-in.
+const PL_SEP = '';
+const PL_BAND = (s) => (s === 2 ? '#da3633' : s === 1 ? '#9e6a03' : '#238636'); // red/amber/green bg
+const hexSgr = (hex, base) =>
+  [String(base), '2', String(parseInt(hex.slice(1, 3), 16)), String(parseInt(hex.slice(3, 5), 16)), String(parseInt(hex.slice(5, 7), 16))];
+
+function powerlineSegments(vm, config) {
+  const t = resolveThresholds(config);
+  const f = rawFields(vm, config);
+  const segs = [];
+  if (f.project) segs.push({ text: f.project, fg: '#1a1030', bg: '#bc8cff', bold: true });
+  if (vm.branch) segs.push({ text: `⎇ ${branchLabel(vm, { aheadBehind: config.fields?.gitAheadBehind ?? true })}`, fg: '#c9d1d9', bg: '#30363d' });
+  if (f.model) segs.push({ text: f.size ? `${f.model} ${f.size}` : f.model, fg: '#ffffff', bg: '#1f6feb' });
+  if (vm.ctxPct != null) segs.push({ text: `● ${Math.round(vm.ctxPct)}%`, fg: '#ffffff', bg: PL_BAND(severity(vm.ctxPct, t.context.warn, t.context.danger)) });
+  if (vm.costUsd != null) segs.push({ text: `$${vm.costUsd.toFixed(2)}`, fg: '#ffffff', bg: PL_BAND(severity(vm.costUsd, t.cost.warn, t.cost.danger)) });
+  const loc = formatLoc(vm.linesAdded, vm.linesRemoved);
+  if (loc) segs.push({ text: loc.replace(' / ', '/'), fg: '#ffffff', bg: '#238636' });
+  return segs;
+}
+
+export function powerlineLayout(vm, config = {}, useColour = supportsColor()) {
+  const segs = powerlineSegments(vm, config);
+  let out = '';
+  segs.forEach((s, i) => {
+    const body = ` ${s.text} `;
+    const next = segs[i + 1];
+    if (useColour) {
+      const seg = [];
+      if (s.bold) seg.push('1');
+      seg.push(...hexSgr(s.fg, 38), ...hexSgr(s.bg, 48));
+      const arrow = [...hexSgr(s.bg, 38), ...(next ? hexSgr(next.bg, 48) : [])];
+      out += `\x1b[${seg.join(';')}m${body}\x1b[0m\x1b[${arrow.join(';')}m${PL_SEP}\x1b[0m`;
+    } else {
+      out += body + PL_SEP;   // same glyphs, no color → strip(colored) === plain
+    }
+  });
+  return [out];
+}
+
 // ── threshold → color (A3) ───────────────────────────────────────────────────
 // One severity mapping drives every threshold field and the health pixel.
 
@@ -390,10 +433,10 @@ function makePainter(vm, config, useColour) {
   return (role, text) => (text == null ? text : theme(role, text, sev, w));
 }
 
-// Layout registry — config.layout selects one; spatial is the only one shipped
-// (compact/zen/powerline land in later phases). Unknown ⇒ spatial.
+// Layout registry. spatial/compact/zen are painter-based (vm, config, paint);
+// powerline is a distinct render path handled in colorize. Unknown ⇒ spatial.
 const LAYOUTS = { spatial: spatialLayout, compact: compactLayout, zen: zenLayout };
-export const IMPLEMENTED_LAYOUTS = Object.keys(LAYOUTS);
+export const IMPLEMENTED_LAYOUTS = [...Object.keys(LAYOUTS), 'powerline'];
 function layoutFor(config) {
   return LAYOUTS[config?.layout] ?? spatialLayout;
 }
@@ -402,6 +445,7 @@ function layoutFor(config) {
 // threshold color applied. Stripping the ANSI yields the exact structure
 // layout (golden-test invariant).
 export function colorize(vm, config = {}, useColour = supportsColor()) {
+  if (config?.layout === 'powerline') return powerlineLayout(vm, config, useColour);
   return layoutFor(config)(vm, config, makePainter(vm, config, useColour));
 }
 

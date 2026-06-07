@@ -815,3 +815,48 @@ test('golden: theme=vivid emits truecolor through the entry', () => {
   assert.equal(r.status, 0);
   assert.ok(/\x1b\[38;2;/.test(r.stdout), 'truecolor present');
 });
+
+// ── Powerline layout (mock direction C — opt-in, needs a Nerd Font) ──────────
+// Background-filled segments joined by the powerline arrow . Distinct render
+// path (backgrounds, not fg painting); still strips to a stable structure.
+
+import { powerlineLayout } from './statusline.js';
+const PL = '';
+
+test('powerline: one line of segments joined by the arrow glyph', () => {
+  const lines = powerlineLayout({ ...vmFull, branch: 'main' }, {}, false);
+  assert.equal(lines.length, 1);
+  const l = lines[0];
+  for (const s of ['claude-statusline', '⎇ main', 'Opus', '● 8%', '$8.40', '+342/−89']) {
+    assert.ok(l.includes(s), `powerline includes ${s}`);
+  }
+  assert.ok(l.includes(PL), 'has the powerline separator');
+});
+
+test('powerline colored uses truecolor backgrounds and strips to the structure', () => {
+  const vm = { ...vmFull, branch: 'main' };
+  const colored = powerlineLayout(vm, {}, true)[0];
+  const plain = powerlineLayout(vm, {}, false)[0];
+  assert.ok(/48;2;/.test(colored), 'has a background color');
+  assert.equal(colored.replace(/\x1b\[[0-9;]*m/g, ''), plain);
+});
+
+test('powerline ctx/cost segment background reflects threshold severity', () => {
+  const danger = powerlineLayout(vmOf({ context_window: { used_percentage: 94 } }), {}, true)[0];
+  assert.ok(danger.includes('48;2;218;54;51'), 'red background at danger');
+});
+
+test('colorize and config dispatch to powerline', () => {
+  assert.equal(colorize(vmFull, { layout: 'powerline' }, false).length, 1);
+  assert.equal(loadConfig({ userPath: tmpConfig({ layout: 'powerline' }), env: {} }).layout, 'powerline');
+});
+
+test('golden: layout=powerline renders through the entry', () => {
+  const cfgPath = tmpConfig({ layout: 'powerline' });
+  const r = spawnSync(process.execPath, [ENTRY, '--color'], {
+    input: fixture('full'), encoding: 'utf8',
+    env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: cfgPath, FORCE_COLOR: '' },
+  });
+  assert.equal(r.status, 0);
+  assert.ok(r.stdout.includes(PL) && /48;2;/.test(r.stdout));
+});
