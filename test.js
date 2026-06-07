@@ -379,3 +379,84 @@ test('golden: zero cost / zero duration renders without crashing', () => {
 test('golden: malformed stdin still emits a valid (empty) bar, exit 0', () => {
   assert.deepEqual(runEntry('not json at all').split('\n'), ['▌', 'ctx ▱▱▱▱▱▱▱▱▱▱ --%']);
 });
+
+// ── A5: install wiring (cli.js init/uninstall) + forced color ────────────────
+
+import { mkdtempSync, writeFileSync as wf, readdirSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { init, uninstall, statusLineBlock, STATUSLINE_PATH } from './cli.js';
+
+const tmpSettings = () => join(mkdtempSync(join(tmpdir(), 'cs-')), 'settings.json');
+
+test('forced color: --color makes the piped (non-TTY) entry emit ANSI', () => {
+  const r = spawnSync(process.execPath, [ENTRY, '--color'], {
+    input: fixture('full'), encoding: 'utf8',
+    env: { ...process.env, FORCE_COLOR: '', NO_COLOR: '' },
+  });
+  assert.equal(r.status, 0);
+  assert.ok(/\x1b\[/.test(r.stdout), 'color present despite non-TTY stdout');
+});
+
+test('--no-color forces plain even under FORCE_COLOR', () => {
+  const r = spawnSync(process.execPath, [ENTRY, '--no-color'], {
+    input: fixture('full'), encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '1' },
+  });
+  assert.ok(!/\x1b\[/.test(r.stdout), 'no escapes with --no-color');
+});
+
+test('statusLineBlock points at statusline.js and forces --color', () => {
+  const b = statusLineBlock();
+  assert.equal(b.type, 'command');
+  assert.ok(b.command.startsWith('node '));
+  assert.ok(b.command.includes(STATUSLINE_PATH));
+  assert.ok(b.command.includes('--color'), 'install forces color on');
+  assert.ok(existsSync(STATUSLINE_PATH), 'target script exists');
+});
+
+test('init writes the statusLine block and preserves other settings keys', () => {
+  const p = tmpSettings();
+  wf(p, JSON.stringify({ model: 'opus', permissions: { allow: ['x'] } }));
+  const r = init({ path: p });
+  assert.ok(r.ok);
+  const s = JSON.parse(readFileSync(p, 'utf8'));
+  assert.equal(s.model, 'opus');                    // untouched
+  assert.deepEqual(s.permissions, { allow: ['x'] }); // untouched
+  assert.ok(s.statusLine.command.includes('--color'));
+});
+
+test('init refuses an existing statusLine unless --force', () => {
+  const p = tmpSettings();
+  wf(p, JSON.stringify({ statusLine: { type: 'command', command: 'old' } }));
+  assert.equal(init({ path: p }).ok, false);                       // refused
+  assert.equal(JSON.parse(readFileSync(p, 'utf8')).statusLine.command, 'old');
+  assert.ok(init({ path: p, force: true }).ok);                    // forced
+  assert.ok(JSON.parse(readFileSync(p, 'utf8')).statusLine.command.includes('--color'));
+});
+
+test('init backs up an existing settings file once', () => {
+  const p = tmpSettings();
+  wf(p, JSON.stringify({ model: 'opus' }));
+  init({ path: p });
+  const baks = readdirSync(dirname(p)).filter((f) => f.includes('settings.json.bak.'));
+  assert.equal(baks.length, 1, 'one backup created');
+});
+
+test('init creates a valid settings.json when none exists (trailing newline)', () => {
+  const p = tmpSettings();
+  assert.ok(init({ path: p }).ok);
+  const raw = readFileSync(p, 'utf8');
+  assert.ok(raw.endsWith('\n'));
+  assert.doesNotThrow(() => JSON.parse(raw));
+});
+
+test('uninstall removes statusLine, preserves other keys, idempotent', () => {
+  const p = tmpSettings();
+  wf(p, JSON.stringify({ model: 'opus', statusLine: { type: 'command', command: 'x' } }));
+  const r1 = uninstall({ path: p });
+  assert.ok(r1.ok && r1.removed);
+  const s = JSON.parse(readFileSync(p, 'utf8'));
+  assert.equal(s.model, 'opus');
+  assert.ok(!('statusLine' in s));
+  const r2 = uninstall({ path: p });          // idempotent
+  assert.ok(r2.ok && !r2.removed);
+});

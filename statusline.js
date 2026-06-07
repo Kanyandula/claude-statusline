@@ -330,8 +330,14 @@ function readStdin() {
   });
 }
 
-async function main() {
-  process.stdout.write(renderLine(await readStdin()) + '\n');
+async function main(argv = process.argv.slice(2)) {
+  // Claude Code pipes our stdout (non-TTY) yet renders our ANSI, so the
+  // installed command passes --color to override TTY detection. --no-color
+  // forces plain. Otherwise fall back to NO_COLOR/FORCE_COLOR/TTY.
+  let useColour;
+  if (argv.includes('--color')) useColour = true;
+  else if (argv.includes('--no-color')) useColour = false;
+  process.stdout.write(renderLine(await readStdin(), { useColour }) + '\n');
 }
 
 // Run only when executed directly (`node statusline.js`), never when imported by

@@ -1,91 +1,40 @@
 #!/bin/sh
-# install.sh — curl install for claude-statusline
+# install.sh — curl install for claude-statusline v2
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Kanyandula/claude-statusline/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Kanyandula/claude-statusline/v2/install.sh | sh
 #
-# This installs ONLY the render-side script, not the full CLI. Use this on
-# machines where `npm i -g @kanyandula/claude-statusline` isn't an option.
-# Switch to npm later if/when it becomes available — that gives you the
-# `claude-statusline` CLI for init/layout/enable/preview/uninstall.
+# v2 is two files (statusline.js + cli.js), zero deps. This downloads them and
+# runs `cli.js init`, which wires statusline.js into ~/.claude/settings.json —
+# backing the file up, merging (not clobbering) other keys, and forcing color
+# on (Claude Code pipes our stdout but renders ANSI). Pass extra args through,
+# e.g. `... | sh -s -- --force` to overwrite an existing statusLine.
 
 set -eu
 
 REPO="Kanyandula/claude-statusline"
-HELPER_DIR="$HOME/.claude/helpers/claude-statusline"
-SETTINGS="$HOME/.claude/settings.json"
-# Pin to a release tag so the file list and source stay in sync with the
-# install.sh asset published at that tag. Bump VERSION when releasing.
-VERSION="v1.0.0"
-RAW_BASE="https://raw.githubusercontent.com/$REPO/refs/tags/$VERSION"
+# Branch during the pre-release soak; pin a tag (e.g. v2.0.0) at publish time.
+REF="${CLAUDE_STATUSLINE_REF:-v2}"
+RAW_BASE="https://raw.githubusercontent.com/$REPO/$REF"
+DEST="$HOME/.claude/helpers/claude-statusline-v2"
 
-# Source files needed to render the statusline. This list MUST be updated
-# whenever new files are added to src/cli/ or src/. Pinned to VERSION above.
-FILES="
-bin/statusline.js
-src/cli/render.js
-src/cli/paths.js
-src/cli/colour.js
-src/cli/config-file.js
-src/cli/fs-util.js
-src/pipeline.js
-src/input.js
-src/adapters/claude.js
-src/render.js
-src/format.js
-src/models.js
-src/ansi.js
-src/config.js
-src/git.js
-"
+if ! command -v node >/dev/null 2>&1; then
+  echo "ERROR: node (>=18) is required and was not found on PATH." >&2
+  exit 1
+fi
 
-echo "Installing claude-statusline renderer into $HELPER_DIR..."
-mkdir -p "$HELPER_DIR"
-
-for f in $FILES; do
-  dest="$HELPER_DIR/$f"
-  mkdir -p "$(dirname "$dest")"
-  if ! curl -fsSL "$RAW_BASE/$f" -o "$dest"; then
+echo "Installing claude-statusline v2 into $DEST ..."
+mkdir -p "$DEST"
+for f in statusline.js cli.js; do
+  if ! curl -fsSL "$RAW_BASE/$f" -o "$DEST/$f"; then
     echo "ERROR: failed to download $f from $RAW_BASE" >&2
     exit 1
   fi
 done
 
-CMD="node $HELPER_DIR/bin/statusline.js"
-
-echo "Renderer installed: $HELPER_DIR/bin/statusline.js"
-
-if command -v jq >/dev/null 2>&1; then
-  if [ -f "$SETTINGS" ]; then
-    cp "$SETTINGS" "$SETTINGS.bak.$(date +%s)"
-    jq --arg cmd "$CMD" \
-       '. + {statusLine: {type: "command", command: $cmd}}' \
-       "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
-    echo "Wired statusLine into $SETTINGS (backup saved)."
-  else
-    mkdir -p "$(dirname "$SETTINGS")"
-    cat > "$SETTINGS" <<EOF
-{
-  "statusLine": {
-    "type": "command",
-    "command": "$CMD"
-  }
-}
-EOF
-    echo "Created $SETTINGS with statusLine wired."
-  fi
-else
-  echo
-  echo "jq not found — add this to $SETTINGS manually:"
-  echo
-  echo '  "statusLine": {'
-  echo '    "type": "command",'
-  echo "    \"command\": \"$CMD\""
-  echo '  }'
-  echo
-fi
+echo "Wiring into Claude Code ..."
+node "$DEST/cli.js" init "$@"
 
 echo
 echo "Done. Restart Claude Code to see the statusline."
-echo "Without the CLI, customise by editing ~/.claude/claude-statusline.json directly."
-echo "See https://github.com/$REPO/blob/main/docs/CONFIG.md for the schema."
+echo "Customise by editing ~/.claude/statusline.json (config schema lands with the config loader)."
