@@ -460,3 +460,22 @@ test('uninstall removes statusLine, preserves other keys, idempotent', () => {
   const r2 = uninstall({ path: p });          // idempotent
   assert.ok(r2.ok && !r2.removed);
 });
+
+// ── A6: README / license consistency ────────────────────────────────────────
+
+test('README leads with install.sh; npm is framed as deferred, never the headline', () => {
+  const readme = readFileSync(join(HERE, 'README.md'), 'utf8');
+  const curlIdx = readme.indexOf('curl -fsSL');
+  const npmIdx = readme.indexOf('npm i -g @kanyandula/claude-statusline');
+  assert.ok(curlIdx > -1, 'install.sh curl present');
+  assert.ok(npmIdx > -1, 'npm command mentioned');
+  assert.ok(curlIdx < npmIdx, 'install.sh appears before the npm command (locked sequencing)');
+  const around = readme.slice(Math.max(0, npmIdx - 220), npmIdx + 220);
+  assert.ok(/coming soon|resolves to \*\*v1\*\*/i.test(around), 'npm framed as coming-soon / resolves-to-v1');
+});
+
+test('package metadata is MIT and the license file matches', () => {
+  const pkg = JSON.parse(readFileSync(join(HERE, 'package.json'), 'utf8'));
+  assert.equal(pkg.license, 'MIT');
+  assert.ok(readFileSync(join(HERE, 'LICENSE'), 'utf8').startsWith('MIT License'));
+});
