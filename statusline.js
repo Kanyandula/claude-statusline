@@ -6,6 +6,7 @@
 
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 // ── stdin parsing ────────────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ export function buildViewModel(raw) {
   const limits = r.rate_limits || {};
 
   return {
+    cwd: cwd || null,                            // full dir — where the git overlay runs
     projectName: cwd ? basename(cwd) : null,
     modelName: str(r.model?.display_name),       // display_name verbatim
     modelShort: shortModel(r.model?.id),
@@ -229,7 +231,7 @@ export function spatialLayout(vm, config = {}, paint = PLAIN) {
       : null;
   const idBody = assemble([
     ['project', project],
-    ['branch', vm.branch],
+    ['branch', branchLabel(vm)],
     ['model', model],
     ['size', size],
   ]);
@@ -306,12 +308,81 @@ export function colorize(vm, config = {}, useColour = supportsColor()) {
   return spatialLayout(vm, config, makePainter(vm, config, useColour));
 }
 
+// ── git overlay (B3) ─────────────────────────────────────────────────────────
+// A single `git status --porcelain=v2 --branch`, parsed to a small record and
+// overlaid onto the view-model. Runs only on Claude Code's event-updates (no
+// refreshInterval by default — OD-1), so re-shelling on an idle timer never
+// happens and no state file is needed.
+
+// Parse porcelain=v2 --branch output. Any non-`#` line means a working-tree
+// change ⇒ dirty. Branch/upstream are control-char-stripped (they reach ANSI
+// output and could otherwise carry an escape sequence).
+export function parseGitStatus(stdout) {
+  if (typeof stdout !== 'string') return null;
+  let branch = null, upstream = null, ahead = 0, behind = 0, dirty = false;
+  for (const line of stdout.split('\n')) {
+    if (line.startsWith('# branch.head ')) branch = line.slice(14).trim();
+    else if (line.startsWith('# branch.upstream ')) upstream = line.slice(18).trim();
+    else if (line.startsWith('# branch.ab ')) {
+      const m = line.match(/\+(\d+)\s+-(\d+)/);
+      if (m) { ahead = Number(m[1]); behind = Number(m[2]); }
+    } else if (line !== '' && !line.startsWith('#')) {
+      dirty = true;
+    }
+  }
+  branch = branch ? stripControlChars(branch).trim() || null : null;
+  upstream = upstream ? stripControlChars(upstream).trim() || null : null;
+  if (branch === '(detached)') branch = null;   // detached HEAD → no named branch
+  return { branch, upstream, ahead, behind, dirty };
+}
+
+// Run git in `cwd`. Plain invocation: no `-c core.fsmonitor=` (that would
+// disable the very speedup large repos rely on) — we benefit from the user's
+// fsmonitor/untrackedCache if they set them. Bounded at 1s and fully guarded:
+// a missing dir, non-git tree, hung lock, or timeout all degrade to null (no
+// git segment) rather than hanging or throwing.
+function defaultGitExec(cwd) {
+  try {
+    const r = spawnSync('git', ['-C', cwd, 'status', '--porcelain=v2', '--branch'], {
+      encoding: 'utf8', timeout: 1000, windowsHide: true,
+    });
+    if (r.error || r.status !== 0 || typeof r.stdout !== 'string') return null;
+    return r.stdout;
+  } catch {
+    return null;
+  }
+}
+
+export function gitInfo(cwd, exec = defaultGitExec) {
+  if (!cwd || typeof cwd !== 'string') return null;
+  const out = exec(cwd);
+  return out == null ? null : parseGitStatus(out);
+}
+
+// Merge git state onto the view-model (no-op when git is null).
+export function overlayGit(vm, git) {
+  if (!git) return vm;
+  return { ...vm, branch: git.branch, upstream: git.upstream, ahead: git.ahead, behind: git.behind, dirty: git.dirty };
+}
+
+// Compose the identity-line branch segment: name + dirty star + ahead/behind.
+export function branchLabel(vm) {
+  if (!vm.branch) return null;
+  let s = `${vm.branch}${vm.dirty ? '*' : ''}`;
+  if (vm.ahead) s += ` ↑${vm.ahead}`;
+  if (vm.behind) s += ` ↓${vm.behind}`;
+  return s;
+}
+
 // ── entry (emit) ─────────────────────────────────────────────────────────────
 
-// render raw stdin to the final multi-line string. Config loading lands in B5;
+// render raw stdin to the final multi-line string. Overlays git for the
+// payload's cwd (injectable via `git` for tests). Config loading lands in B5;
 // for now the defaults drive everything.
-export function renderLine(raw, { config = {}, useColour } = {}) {
-  return colorize(readPayload(raw), config, useColour ?? supportsColor()).join('\n');
+export function renderLine(raw, { config = {}, useColour, git } = {}) {
+  const vm = readPayload(raw);
+  const info = git !== undefined ? git : gitInfo(vm.cwd);
+  return colorize(overlayGit(vm, info), config, useColour ?? supportsColor()).join('\n');
 }
 
 // Statusline payloads are tiny; cap stdin at 1 MB so a wedged upstream pipe

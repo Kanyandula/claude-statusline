@@ -479,3 +479,92 @@ test('package metadata is MIT and the license file matches', () => {
   assert.equal(pkg.license, 'MIT');
   assert.ok(readFileSync(join(HERE, 'LICENSE'), 'utf8').startsWith('MIT License'));
 });
+
+// ── B3: git overlay ─────────────────────────────────────────────────────────
+// A single ~1s-bounded `git status --porcelain=v2 --branch` (plain — no
+// fsmonitor override), parsed to {branch, upstream, ahead, behind, dirty}.
+// try/catch + timeout → null (no git segment). The entry overlays it onto the
+// view-model before render.
+
+import { parseGitStatus, gitInfo, branchLabel } from './statusline.js';
+
+function tempGitRepo() {
+  const dir = mkdtempSync(join(tmpdir(), 'csgit-'));
+  const run = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+  run(['init', '-b', 'work']);
+  run(['config', 'user.email', 't@t']);
+  run(['config', 'user.name', 't']);
+  run(['config', 'commit.gpgsign', 'false']);
+  wf(join(dir, 'a.txt'), 'hi');
+  run(['add', '.']);
+  run(['commit', '-m', 'init']);
+  return { dir, run };
+}
+
+test('parseGitStatus reads branch, upstream, ahead/behind, and dirty', () => {
+  const out = [
+    '# branch.oid abc123',
+    '# branch.head work',
+    '# branch.upstream origin/work',
+    '# branch.ab +2 -1',
+    '1 .M N... 100644 100644 100644 aaa bbb a.txt',
+  ].join('\n');
+  const g = parseGitStatus(out);
+  assert.equal(g.branch, 'work');
+  assert.equal(g.upstream, 'origin/work');
+  assert.equal(g.ahead, 2);
+  assert.equal(g.behind, 1);
+  assert.equal(g.dirty, true);
+});
+
+test('parseGitStatus: clean repo, no upstream → zeros and not dirty', () => {
+  const g = parseGitStatus('# branch.oid abc\n# branch.head main\n');
+  assert.equal(g.branch, 'main');
+  assert.equal(g.upstream, null);
+  assert.equal(g.ahead, 0);
+  assert.equal(g.behind, 0);
+  assert.equal(g.dirty, false);
+});
+
+test('parseGitStatus: untracked file counts as dirty', () => {
+  assert.equal(parseGitStatus('# branch.head main\n? newfile.txt\n').dirty, true);
+});
+
+test('parseGitStatus strips control chars from the branch name (injection guard)', () => {
+  const g = parseGitStatus('# branch.head wo\x1b]0;x\x07rk\n');
+  assert.ok(!/[\x00-\x1f\x7f-\x9f]/.test(g.branch));
+});
+
+test('gitInfo reads a real repo and tracks the dirty transition', () => {
+  const { dir } = tempGitRepo();
+  let g = gitInfo(dir);
+  assert.equal(g.branch, 'work');
+  assert.equal(g.dirty, false);
+  wf(join(dir, 'a.txt'), 'changed');
+  g = gitInfo(dir);
+  assert.equal(g.dirty, true);
+});
+
+test('gitInfo returns null for a missing/non-git dir (degrade to no segment)', () => {
+  assert.equal(gitInfo('/nonexistent/definitely/not/a/repo'), null);
+  assert.equal(gitInfo(null), null);
+});
+
+test('branchLabel composes name + dirty star + ahead/behind', () => {
+  assert.equal(branchLabel({ branch: 'main', dirty: false, ahead: 0, behind: 0 }), 'main');
+  assert.equal(branchLabel({ branch: 'main', dirty: true, ahead: 0, behind: 0 }), 'main*');
+  assert.equal(branchLabel({ branch: 'main', dirty: true, ahead: 2, behind: 1 }), 'main* ↑2 ↓1');
+  assert.equal(branchLabel({ branch: null }), null);
+});
+
+test('spatial identity shows the composed branch label when overlaid', () => {
+  const [id] = spatialLayout({ ...vmFull, branch: 'work', dirty: true, ahead: 2, behind: 1 });
+  assert.ok(id.includes('work*'));
+  assert.ok(id.includes('↑2') && id.includes('↓1'));
+});
+
+test('golden: the entry overlays a real repo branch onto the identity line', () => {
+  const { dir } = tempGitRepo();
+  const id = pipe({ workspace: { current_dir: dir }, model: { display_name: 'Opus' } }).split('\n')[0];
+  assert.ok(id.includes('work'), `branch overlaid: ${id}`);
+});

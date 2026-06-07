@@ -105,6 +105,21 @@ stdin → readPayload (adapter) → spatial layout → colorize (thresholds) →
 See the [statusLine docs](https://code.claude.com/docs/en/statusline) for the
 full stdin contract.
 
+### On a large monorepo
+
+The branch segment runs a single `git status` per update — and **only** when
+Claude Code re-renders, never on an idle timer. On a big repo, turn on Git's own
+accelerators so that stays fast:
+
+```bash
+git config core.fsmonitor true
+git config core.untrackedCache true
+```
+
+claude-statusline *benefits* from these if you set them but never writes to your
+repo config. If a `git status` ever exceeds ~1s it's dropped for that render —
+the bar shows no branch rather than stalling.
+
 ---
 
 ## Development
