@@ -51,18 +51,20 @@ All field access lives in **one adapter** (`readPayload(stdin) → ViewModel`). 
 stdin → normalize → select layout → colorize (thresholds) → emit ANSI
 ```
 
-- **normalize** — adapter produces a flat, typed view-model. Git info via a **single** call: `git -c core.fsmonitor= -c core.hooksPath=/dev/null status --porcelain=v2 --branch` (no network) — the `-c` flags carry forward v1's perf hardening (skip the fsmonitor handshake and any repo hooks). Branch from `# branch.head`, upstream from `# branch.upstream` (absent ⇒ no upstream), ahead/behind from `# branch.ab +A -B` (absent ⇒ empty), dirty = any non-`#` line present. Wrap in try/catch so a non-git dir degrades to no git segment rather than an error. (Untracked-file scanning is the costly part of `git status`; `--untracked-files=no` is an available perf lever but changes dirty-semantics — see OD-1.)
+- **normalize** — adapter produces a flat, typed view-model. Git info via a **single** call: `git status --porcelain=v2 --branch` (no network), **time-bounded (~1s) and try/catch-guarded** so a non-git dir, a hung index lock, or a pathological large-repo status degrades to *no git segment* rather than hanging or erroring the bar. Branch from `# branch.head`, upstream from `# branch.upstream` (absent ⇒ no upstream), ahead/behind from `# branch.ab +A -B` (absent ⇒ empty), dirty = any non-`#` line present. **Do not pass `-c core.fsmonitor=`** — that *disables* fsmonitor and slows status on the very monorepos that need it (corrects an earlier finding). Run plain so the user's `core.fsmonitor` / `core.untrackedCache` accelerate us if set; recommend enabling them to monorepo users in the README, but never write to their repo config.
 - **layout** — pure function `(viewModel, config) → string[]`, one entry per line. No color, no I/O. Trivially testable.
 - **colorize** — wraps fields in ANSI per threshold state. Isolated so golden tests can assert structure with color stripped *and* the escape codes with color on.
 - **emit** — join and print. Nothing else writes to stdout.
 
-Perf budget: the script runs on every render and every refresh tick, so it must stay local and fast — no network, no heavy spawns (one `git` invocation max). Use `refreshInterval` (minimum 1s) only for the time/burn-rate fields so the clock advances while the session is idle. Note OD-1: `refreshInterval` re-runs the *whole* script — including that git call — on every tick, not just on message events.
+Perf budget: the script runs on every render and every refresh tick, so it must stay local and fast — no network, no heavy spawns (one `git` invocation max, ~1s-bounded). **Default config sets NO `refreshInterval`** (see OD-1 resolution): git runs only on Claude Code's event-updates — which is exactly when git state can change — so there is no idle git storm and no state file. `refreshInterval` + a git cache is a documented opt-in for users who want an idle-advancing clock.
 
 ---
 
 ## Open decisions
 
-- **OD-1 — `refreshInterval` vs. per-render `git status` (perf).** Enabling `refreshInterval` for the idle clock (rule 5 / burn-rate) re-runs the whole script — including the `git status` call — on every timer tick, not just on message events. The statusLine docs explicitly flag `git status` as the slow path in large repos and recommend caching git state to a `session_id`-keyed temp file refreshed every ~5s. That collides with this plan's stdout-only / no-state-file rule (currently waived only for a hypothetical rolling burn-rate). The `-c core.fsmonitor=` / `--untracked-files=no` flags (see normalize) cut the cost but don't eliminate it. **Decide before B3/B5:** (a) keep the call cheap and accept a full `git status` per tick, (b) adopt the docs' `session_id` git cache and relax the no-state-file rule for git, or (c) gate the git segment behind a coarser interval than the clock. **Unresolved.**
+- **OD-1 — `refreshInterval` vs. per-render `git status` — RESOLVED 2026-06-07 (Option 1).** Default config sets **no `refreshInterval`**, so git runs only on Claude Code's event-updates. Rationale: git state changes only *as a consequence of events* (a tool ran, a commit landed), and CC fires an event-update at exactly those moments — so event cadence is coincident with the only times git can differ, not a compromise against a timer. Re-running `git status` on an idle timer recomputes the same answer repeatedly (wasted work, and a per-tick storm on a monorepo like Atlas/sxm-android). The only thing that advances while idle is wall-clock time, and a glance-bar clock being a few seconds stale while unobserved is irrelevant (burn-rate is already opt-in/off and session-average).
+  - **The state file is not abandoned — it's scoped.** Default = no state file, event cadence, monorepo-safe. The `session_id`-keyed git cache (docs' pattern) is the *correct implementation* of the opt-in path: a statusline script re-runs wholesale and can't refresh just the clock, so the only way to add `refreshInterval` without re-shelling git is to cache git. So Option 1 *contains* Option 2 — Option 1 is the default, Option 2 is the documented mechanism that appears only when a user enables `refreshInterval`. Keeps the no-state-file rule pure by default; the cache is a named, scoped exception tied to an explicit opt-in (consistent with rolling burn-rate).
+  - **B3 robustness add-ons (both stateless):** (1) bound the git call with a ~1s timeout → degrade to no-git-segment via the existing try/catch; (2) benefit from the user's `core.fsmonitor`/`core.untrackedCache` if set, document them as a monorepo recommendation, but never write to the user's repo config. Do **not** pass `-c core.fsmonitor=` (it disables the speedup).
 
 ---
 
@@ -145,7 +147,7 @@ The v1 failure mode this plan exists to prevent: tests that pass without renderi
 **Phase B — layouts + economics**
 - [ ] B1 `compact` / `zen` (config-data variations preferred over code paths; only if the default proves limiting). `powerline` deferred to Phase C.
 - [ ] B2 burn-rate (session-average `$/h`, wall-clock denominator, opt-in/off, self-suppressing)
-- [ ] B3 git ahead/behind (already free from the single `git status --porcelain=v2 --branch` call) — resolve OD-1 first
+- [ ] B3 git overlay: branch + dirty + ahead/behind from a single ~1s-bounded `git status --porcelain=v2 --branch` (plain, no fsmonitor override); try/catch → no-git-segment. OD-1 resolved (Option 1).
 - [ ] B4 progressive disclosure of context size (`context_window_size != defaultWindowSize`)
 - [ ] B5 config file + precedence (incl. `defaultWindowSize`, `rateLimits`) — resolve OD-1 first
 - [ ] B6 npm publish under `@kanyandula/claude-statusline`:
@@ -168,7 +170,7 @@ The v1 failure mode this plan exists to prevent: tests that pass without renderi
 - 2 files, zero deps, `node --test`. No build step.
 - All stdin access through one adapter; null-tolerant on `context_window_size` and `used_percentage`.
 - Window size comes from `context_window.context_window_size`; **no hardcoded model→size table**. Progressive-disclosure sentinel is config `defaultWindowSize` (default 200000), not a literal.
-- Git state from a **single** `git -c core.fsmonitor= -c core.hooksPath=/dev/null status --porcelain=v2 --branch` call (v1 perf flags carried forward), try/catch-guarded. Per-tick git cost under `refreshInterval` is **OD-1 (open)**.
+- Git state from a **single, ~1s-bounded** `git status --porcelain=v2 --branch` call, try/catch-guarded → no-git-segment on failure/timeout. Run **plain** (no `-c core.fsmonitor=` — that disables the monorepo speedup); benefit from the user's fsmonitor/untrackedCache if set, recommend them in docs, never write repo config. **OD-1 resolved (Option 1):** default sets no `refreshInterval` (git on event-updates only, no state file); `refreshInterval` + a `session_id` git cache is the documented opt-in.
 - Phase A ships `spatial` only; alternative layouts are later phases and prefer config-data over new code paths.
 - Default layout = `spatial`; default = five fields; extras opt-in. Burn-rate and rate_limits are opt-in, off by default, and self-suppress when source data is absent.
 - Burn-rate is **session-average** `$/h`, stateless, wall-clock denominator; a rolling rate is out of scope (Phase C + state file if ever).
