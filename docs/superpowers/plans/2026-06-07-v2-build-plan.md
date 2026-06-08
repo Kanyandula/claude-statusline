@@ -19,7 +19,7 @@ Claude Code pipes a JSON object to stdin on every render. v2 reads only from thi
 
 Fields v2 consumes:
 
-- `model.display_name` / `model.id` — identity; use `display_name` verbatim for the long label, trim `id` to a short name. **Do NOT map id → window size.** stdin already ships `context_window.context_window_size` — read it directly. A hardcoded id→size table would violate this plan's own "derive from the authoritative source, never a hardcoded model table" principle.
+- `model.display_name` / `model.id` — identity; use `display_name` for the long label (but **strip a trailing "(… context)"** — real CC sends "Opus 4.8 (1M context)", and the derived size label already shows the window, so verbatim use doubles it: "… (1M context) · 1M". Corrected 2026-06-08 from live data; the original "verbatim" assumption was wrong). Trim `id` to a short name. **Do NOT map id → window size.** stdin already ships `context_window.context_window_size` — read it directly. A hardcoded id→size table would violate this plan's own "derive from the authoritative source, never a hardcoded model table" principle.
 - `context_window.context_window_size` — authoritative window size (200000, or 1000000 for extended-context models); sole input to progressive-disclosure of the context-size label. **Null-tolerant:** absent (older CC) ⇒ treat as default ⇒ label hidden, no crash. The "default" it is compared against is config (`defaultWindowSize`, default 200000), never a literal buried in the render path.
 - `workspace.current_dir` (+ `project_dir`) — project name.
 - `context_window.used_percentage` — drives the context bar (the headline metric). Null-tolerant — see render-fallback below.

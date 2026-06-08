@@ -98,9 +98,24 @@ test('cwd is used when workspace.current_dir is absent', () => {
   assert.equal(vm.projectName, 'myproj');
 });
 
-test('display_name is taken verbatim, including a trailing context suffix', () => {
-  const vm = readPayload(JSON.stringify({ model: { id: 'claude-opus-4-8', display_name: 'Opus 4.8 (1M context)' } }));
-  assert.equal(vm.modelName, 'Opus 4.8 (1M context)');
+test('a trailing context suffix in display_name is stripped (size label is the single source)', () => {
+  // Real CC sends e.g. "Opus 4.8 (1M context)"; the derived size label already
+  // shows the window, so the embedded one would double it.
+  assert.equal(readPayload(JSON.stringify({ model: { display_name: 'Opus 4.8 (1M context)' } })).modelName, 'Opus 4.8');
+  assert.equal(readPayload(JSON.stringify({ model: { display_name: 'Sonnet 4.6 (200K context)' } })).modelName, 'Sonnet 4.6');
+  assert.equal(readPayload(JSON.stringify({ model: { display_name: 'Opus' } })).modelName, 'Opus'); // no suffix → unchanged
+});
+
+test('model + non-default window render the size exactly once (no doubling)', () => {
+  const vm = readPayload(JSON.stringify({
+    workspace: { current_dir: '/x/proj' },
+    model: { display_name: 'Opus 4.8 (1M context)' },
+    context_window: { context_window_size: 1000000 },
+  }));
+  const [id] = spatialLayout(vm);
+  assert.ok(id.includes('Opus 4.8 · 1M'), id);
+  assert.ok(!id.includes('context'), 'no embedded context suffix');
+  assert.equal((id.match(/1M/g) || []).length, 1, 'size shown once');
 });
 
 test('modelShort strips claude- prefix and date/bracket suffixes', () => {

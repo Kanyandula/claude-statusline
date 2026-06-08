@@ -78,6 +78,16 @@ const str = (v) => {
   return clean || null;
 };
 
+// Some CC display_names embed the window, e.g. "Opus 4.8 (1M context)". Strip a
+// trailing "(… context)" so the size label derived from context_window_size is
+// the single source — otherwise the window shows twice ("… (1M context) · 1M").
+// Conservative: only strips a trailing parenthetical that mentions "context".
+function modelBaseName(displayName) {
+  const s = str(displayName);
+  if (!s) return null;
+  return s.replace(/\s*\([^()]*\bcontext\b[^()]*\)\s*$/i, '').trim() || s;
+}
+
 // Derive a short model name from `model.id` WITHOUT a hardcoded model table:
 //   claude-opus-4-8            → opus-4-8
 //   claude-haiku-4-5-20251001  → haiku-4-5   (drop trailing release date)
@@ -106,7 +116,7 @@ export function buildViewModel(raw) {
   return {
     cwd: cwd || null,                            // full dir — where the git overlay runs
     projectName: cwd ? basename(cwd) : null,
-    modelName: str(r.model?.display_name),       // display_name verbatim
+    modelName: modelBaseName(r.model?.display_name), // strips embedded "(… context)"
     modelShort: shortModel(r.model?.id),
 
     contextWindowSize: num(ctx.context_window_size),
