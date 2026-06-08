@@ -297,18 +297,17 @@ const withPixel = (body, paint) => {
   return body ? `${pixel} ${body}` : pixel;
 };
 
+// The two field groups spatial splits across lines; compact concatenates them.
+const IDENTITY_ROLES = ['project', 'branch', 'model', 'size'];
+const STATE_ROLES = ['ctx', 'duration', 'cost', 'burn', 'loc'];
+const pairs = (roles, f) => roles.map((r) => [r, f[r]]);
+
 // spatial (default): two lines — identity, then state.
 export function spatialLayout(vm, config = {}, paint = PLAIN) {
   const sep = config.separators ?? '·';
   const f = rawFields(vm, config);
-  const identity = withPixel(
-    assembleLine([['project', f.project], ['branch', f.branch], ['model', f.model], ['size', f.size]], sep, paint),
-    paint,
-  );
-  const state = assembleLine(
-    [['ctx', f.ctx], ['duration', f.duration], ['cost', f.cost], ['burn', f.burn], ['loc', f.loc]],
-    sep, paint,
-  );
+  const identity = withPixel(assembleLine(pairs(IDENTITY_ROLES, f), sep, paint), paint);
+  const state = assembleLine(pairs(STATE_ROLES, f), sep, paint);
   return [identity, state];
 }
 
@@ -316,10 +315,7 @@ export function spatialLayout(vm, config = {}, paint = PLAIN) {
 export function compactLayout(vm, config = {}, paint = PLAIN) {
   const sep = config.separators ?? '·';
   const f = rawFields(vm, config);
-  const body = assembleLine([
-    ['project', f.project], ['branch', f.branch], ['model', f.model], ['size', f.size],
-    ['ctx', f.ctx], ['duration', f.duration], ['cost', f.cost], ['burn', f.burn], ['loc', f.loc],
-  ], sep, paint);
+  const body = assembleLine(pairs([...IDENTITY_ROLES, ...STATE_ROLES], f), sep, paint);
   return [withPixel(body, paint)];
 }
 
@@ -342,22 +338,26 @@ export function zenLayout(vm, config = {}, paint = PLAIN) {
 const PL_SEP = '';
 const PL_BAND = (s) => (s === 2 ? '#da3633' : s === 1 ? '#9e6a03' : '#238636'); // red/amber/green bg
 
+// Depth for pure callers that don't pass one: config can force 256, else
+// truecolor. (The entry resolves env-aware depth via resolveColorDepth.)
+const fallbackDepth = (config) => (config?.colorDepth === '256' ? '256' : 'truecolor');
+
 function powerlineSegments(vm, config) {
-  const t = resolveThresholds(config);
+  const sev = severityBands(vm, config);
   const f = rawFields(vm, config);
   const segs = [];
   if (f.project) segs.push({ text: f.project, fg: '#1a1030', bg: '#bc8cff', bold: true });
   if (vm.branch) segs.push({ text: `⎇ ${branchLabel(vm, { aheadBehind: config.fields?.gitAheadBehind ?? true })}`, fg: '#c9d1d9', bg: '#30363d' });
   if (f.model) segs.push({ text: f.size ? `${f.model} ${f.size}` : f.model, fg: '#ffffff', bg: '#1f6feb' });
-  if (vm.ctxPct != null) segs.push({ text: `● ${Math.round(vm.ctxPct)}%`, fg: '#ffffff', bg: PL_BAND(severity(vm.ctxPct, t.context.warn, t.context.danger)) });
-  if (vm.costUsd != null) segs.push({ text: `$${vm.costUsd.toFixed(2)}`, fg: '#ffffff', bg: PL_BAND(severity(vm.costUsd, t.cost.warn, t.cost.danger)) });
+  if (vm.ctxPct != null) segs.push({ text: `● ${Math.round(vm.ctxPct)}%`, fg: '#ffffff', bg: PL_BAND(sev.ctx) });
+  if (vm.costUsd != null) segs.push({ text: `$${vm.costUsd.toFixed(2)}`, fg: '#ffffff', bg: PL_BAND(sev.cost) });
   const loc = formatLoc(vm.linesAdded, vm.linesRemoved);
   if (loc) segs.push({ text: loc.replace(' / ', '/'), fg: '#ffffff', bg: '#238636' });
   return segs;
 }
 
 export function powerlineLayout(vm, config = {}, useColour = supportsColor(), depth) {
-  const d = depth ?? (config.colorDepth === '256' ? '256' : 'truecolor');
+  const d = depth ?? fallbackDepth(config);
   const segs = powerlineSegments(vm, config);
   let out = '';
   segs.forEach((s, i) => {
@@ -409,6 +409,15 @@ function worstSeverity(severities) {
   return present.length ? Math.max(...present) : -1;
 }
 
+// The threshold severity of every escalating role, plus the worst-of pixel.
+// One source for both the painter (themed layouts) and powerline.
+function severityBands(vm, config) {
+  const t = resolveThresholds(config);
+  const ctx = severity(vm.ctxPct, t.context.warn, t.context.danger);
+  const cost = severity(vm.costUsd, t.cost.warn, t.cost.danger);
+  return { ctx, cost, pixel: worstSeverity([ctx, cost]) };
+}
+
 // ── themes ───────────────────────────────────────────────────────────────────
 // A theme is `paint(role, text, sev, w)` → painted string. minimal keeps the
 // terminal's ANSI palette and only colors the threshold roles (identity plain).
@@ -454,10 +463,7 @@ export const KNOWN_THEMES = Object.keys(THEMES);
 // each threshold role once and delegates per-role coloring to the theme.
 function makePainter(vm, config, useColour, depth) {
   const theme = THEMES[config?.theme] ?? THEMES.minimal;
-  const t = resolveThresholds(config);
-  const ctx = severity(vm.ctxPct, t.context.warn, t.context.danger);
-  const cost = severity(vm.costUsd, t.cost.warn, t.cost.danger);
-  const sev = { ctx, cost, pixel: worstSeverity([ctx, cost]) };
+  const sev = severityBands(vm, config);
   const w = useColour ? (spec, text) => wrap(spec, text, depth) : PLAIN;
   return (role, text) => (text == null ? text : theme(role, text, sev, w));
 }
@@ -485,7 +491,7 @@ export function resolveColorDepth(config = {}, env = process.env) {
 // config.colorDepth forces 256). Stripping the ANSI yields the exact structure
 // layout (golden-test invariant) regardless of depth.
 export function colorize(vm, config = {}, useColour = supportsColor(), depth) {
-  const d = depth ?? (config.colorDepth === '256' ? '256' : 'truecolor');
+  const d = depth ?? fallbackDepth(config);
   if (config?.layout === 'powerline') return powerlineLayout(vm, config, useColour, d);
   return layoutFor(config)(vm, config, makePainter(vm, config, useColour, d));
 }
@@ -502,10 +508,7 @@ export const DEFAULT_CONFIG = {
   separators: '·',
   defaultWindowSize: 200000,
   maxProjectWidth: 24,
-  thresholds: {
-    context: { warn: 60, danger: 85 },
-    cost: { warn: 5, danger: 20 },
-  },
+  thresholds: DEFAULT_THRESHOLDS,
   fields: {
     burnRate: false,
     apiRatio: false,
@@ -520,7 +523,7 @@ function defaultConfigPath() {
 }
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const finiteNum = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+const finiteNum = (v, d) => num(v) ?? d;
 
 // Reject paths that aren't an absolute *.json — guards against a stray
 // CLAUDE_STATUSLINE_CONFIG pointing the loader at /etc/passwd or a relative
@@ -551,12 +554,8 @@ function deepMerge(base, over) {
 }
 
 function applyEnv(cfg, env) {
-  if (!isPlainObject(env)) return cfg;
-  let out = cfg;
-  if (IMPLEMENTED_LAYOUTS.includes(env.CLAUDE_STATUSLINE_LAYOUT)) {
-    out = { ...out, layout: env.CLAUDE_STATUSLINE_LAYOUT };
-  }
-  return out;
+  const layout = env?.CLAUDE_STATUSLINE_LAYOUT;
+  return IMPLEMENTED_LAYOUTS.includes(layout) ? { ...cfg, layout } : cfg;
 }
 
 // Rebuild from defaults taking only correctly-typed values; drop unknown keys.
