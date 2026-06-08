@@ -39,20 +39,40 @@ export function stripControlChars(s) {
 
 const SGR = { red: 31, green: 32, yellow: 33, dim: 2, bold: 1, reset: 0 };
 
-// Resolve one style token to SGR parameter strings: a named ANSI code
-// ('green'), a raw number, or a truecolor hex ('#rrggbb' → 38;2;r;g;b).
-function sgrParams(token) {
-  if (typeof token === 'number') return [String(token)];
-  if (typeof token === 'string' && /^#[0-9a-f]{6}$/i.test(token)) {
-    return ['38', '2', String(parseInt(token.slice(1, 3), 16)), String(parseInt(token.slice(3, 5), 16)), String(parseInt(token.slice(5, 7), 16))];
+// Downsample an (r,g,b) to an xterm-256 index — grayscale ramp when r≈g≈b, else
+// the 6×6×6 color cube — so truecolor hexes render (approximately) on 256-color
+// terminals like Apple Terminal.
+const CUBE = [0, 95, 135, 175, 215, 255];
+const cubeIdx = (v) => CUBE.reduce((best, lvl, i) => (Math.abs(lvl - v) < Math.abs(CUBE[best] - v) ? i : best), 0);
+function rgbTo256(r, g, b) {
+  if (r === g && g === b) {
+    if (r < 8) return 16;
+    if (r > 248) return 231;
+    return 232 + Math.round(((r - 8) / 247) * 24);
   }
+  return 16 + 36 * cubeIdx(r) + 6 * cubeIdx(g) + cubeIdx(b);
+}
+
+// SGR params for a hex color at `base` (38 fg / 48 bg), honoring color depth.
+function hexCode(hex, base, depth) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return depth === '256'
+    ? [String(base), '5', String(rgbTo256(r, g, b))]
+    : [String(base), '2', String(r), String(g), String(b)];
+}
+
+// Resolve one style token to SGR params: a named ANSI code ('green'), a raw
+// number, or a truecolor hex ('#rrggbb' → 38;2;… or 38;5;… per depth).
+function sgrParams(token, depth) {
+  if (typeof token === 'number') return [String(token)];
+  if (typeof token === 'string' && /^#[0-9a-f]{6}$/i.test(token)) return hexCode(token, 38, depth);
   return SGR[token] !== undefined ? [String(SGR[token])] : [];
 }
 
 // Wrap text in an SGR escape; `style` is a token or array of tokens composed
-// into one sequence. Unknown/empty styles pass the text through unchanged.
-export function wrap(style, text) {
-  const codes = (Array.isArray(style) ? style : [style]).flatMap(sgrParams);
+// into one sequence. `depth` controls hex rendering (truecolor vs 256).
+export function wrap(style, text, depth = 'truecolor') {
+  const codes = (Array.isArray(style) ? style : [style]).flatMap((t) => sgrParams(t, depth));
   return codes.length ? `\x1b[${codes.join(';')}m${text}\x1b[0m` : text;
 }
 
@@ -321,8 +341,6 @@ export function zenLayout(vm, config = {}, paint = PLAIN) {
 // removed). Without a Nerd Font the arrows render as tofu — hence opt-in.
 const PL_SEP = '';
 const PL_BAND = (s) => (s === 2 ? '#da3633' : s === 1 ? '#9e6a03' : '#238636'); // red/amber/green bg
-const hexSgr = (hex, base) =>
-  [String(base), '2', String(parseInt(hex.slice(1, 3), 16)), String(parseInt(hex.slice(3, 5), 16)), String(parseInt(hex.slice(5, 7), 16))];
 
 function powerlineSegments(vm, config) {
   const t = resolveThresholds(config);
@@ -338,7 +356,8 @@ function powerlineSegments(vm, config) {
   return segs;
 }
 
-export function powerlineLayout(vm, config = {}, useColour = supportsColor()) {
+export function powerlineLayout(vm, config = {}, useColour = supportsColor(), depth) {
+  const d = depth ?? (config.colorDepth === '256' ? '256' : 'truecolor');
   const segs = powerlineSegments(vm, config);
   let out = '';
   segs.forEach((s, i) => {
@@ -347,8 +366,8 @@ export function powerlineLayout(vm, config = {}, useColour = supportsColor()) {
     if (useColour) {
       const seg = [];
       if (s.bold) seg.push('1');
-      seg.push(...hexSgr(s.fg, 38), ...hexSgr(s.bg, 48));
-      const arrow = [...hexSgr(s.bg, 38), ...(next ? hexSgr(next.bg, 48) : [])];
+      seg.push(...hexCode(s.fg, 38, d), ...hexCode(s.bg, 48, d));
+      const arrow = [...hexCode(s.bg, 38, d), ...(next ? hexCode(next.bg, 48, d) : [])];
       out += `\x1b[${seg.join(';')}m${body}\x1b[0m\x1b[${arrow.join(';')}m${PL_SEP}\x1b[0m`;
     } else {
       out += body + PL_SEP;   // same glyphs, no color → strip(colored) === plain
@@ -433,13 +452,13 @@ export const KNOWN_THEMES = Object.keys(THEMES);
 
 // Build the painter colorize injects into the layout. Computes the severity of
 // each threshold role once and delegates per-role coloring to the theme.
-function makePainter(vm, config, useColour) {
+function makePainter(vm, config, useColour, depth) {
   const theme = THEMES[config?.theme] ?? THEMES.minimal;
   const t = resolveThresholds(config);
   const ctx = severity(vm.ctxPct, t.context.warn, t.context.danger);
   const cost = severity(vm.costUsd, t.cost.warn, t.cost.danger);
   const sev = { ctx, cost, pixel: worstSeverity([ctx, cost]) };
-  const w = useColour ? wrap : PLAIN;
+  const w = useColour ? (spec, text) => wrap(spec, text, depth) : PLAIN;
   return (role, text) => (text == null ? text : theme(role, text, sev, w));
 }
 
@@ -451,12 +470,24 @@ function layoutFor(config) {
   return LAYOUTS[config?.layout] ?? spatialLayout;
 }
 
-// colorize(vm, config, useColour) → string[]. The selected layout with
-// threshold color applied. Stripping the ANSI yields the exact structure
-// layout (golden-test invariant).
-export function colorize(vm, config = {}, useColour = supportsColor()) {
-  if (config?.layout === 'powerline') return powerlineLayout(vm, config, useColour);
-  return layoutFor(config)(vm, config, makePainter(vm, config, useColour));
+// Resolve the effective color depth. Explicit config wins; 'auto' (the default)
+// downgrades to 256 only for Apple Terminal — a reliable positive ID — since
+// COLORTERM is unreliable there. Other terminals get truecolor.
+export function resolveColorDepth(config = {}, env = process.env) {
+  const cd = config.colorDepth;
+  if (cd === '256' || cd === 'truecolor') return cd;
+  return env.TERM_PROGRAM === 'Apple_Terminal' ? '256' : 'truecolor';
+}
+
+// colorize(vm, config, useColour, depth) → string[]. The selected layout with
+// threshold color applied. `depth` controls truecolor vs 256 hex output (the
+// entry resolves it from env; pure callers default to truecolor unless
+// config.colorDepth forces 256). Stripping the ANSI yields the exact structure
+// layout (golden-test invariant) regardless of depth.
+export function colorize(vm, config = {}, useColour = supportsColor(), depth) {
+  const d = depth ?? (config.colorDepth === '256' ? '256' : 'truecolor');
+  if (config?.layout === 'powerline') return powerlineLayout(vm, config, useColour, d);
+  return layoutFor(config)(vm, config, makePainter(vm, config, useColour, d));
 }
 
 // ── config (B5) ──────────────────────────────────────────────────────────────
@@ -467,6 +498,7 @@ export function colorize(vm, config = {}, useColour = supportsColor()) {
 export const DEFAULT_CONFIG = {
   layout: 'spatial',
   theme: 'minimal',
+  colorDepth: 'auto',
   separators: '·',
   defaultWindowSize: 200000,
   maxProjectWidth: 24,
@@ -544,6 +576,7 @@ function normalizeConfig(cfg) {
   return {
     layout: IMPLEMENTED_LAYOUTS.includes(s.layout) ? s.layout : DEFAULT_CONFIG.layout,
     theme: KNOWN_THEMES.includes(s.theme) ? s.theme : DEFAULT_CONFIG.theme,
+    colorDepth: ['auto', 'truecolor', '256'].includes(s.colorDepth) ? s.colorDepth : DEFAULT_CONFIG.colorDepth,
     separators: typeof s.separators === 'string' && s.separators ? s.separators : DEFAULT_CONFIG.separators,
     defaultWindowSize: finiteNum(s.defaultWindowSize, DEFAULT_CONFIG.defaultWindowSize),
     maxProjectWidth: mpw > 0 ? Math.floor(mpw) : DEFAULT_CONFIG.maxProjectWidth,
@@ -636,10 +669,10 @@ export function branchLabel(vm, { aheadBehind = true } = {}) {
 // render raw stdin to the final multi-line string. Overlays git for the
 // payload's cwd (injectable via `git` for tests). Config loading lands in B5;
 // for now the defaults drive everything.
-export function renderLine(raw, { config = {}, useColour, git } = {}) {
+export function renderLine(raw, { config = {}, useColour, git, depth } = {}) {
   const vm = readPayload(raw);
   const info = git !== undefined ? git : gitInfo(vm.cwd);
-  return colorize(overlayGit(vm, info), config, useColour ?? supportsColor()).join('\n');
+  return colorize(overlayGit(vm, info), config, useColour ?? supportsColor(), depth).join('\n');
 }
 
 // Statusline payloads are tiny; cap stdin at 1 MB so a wedged upstream pipe
@@ -666,7 +699,8 @@ async function main(argv = process.argv.slice(2)) {
   if (argv.includes('--color')) useColour = true;
   else if (argv.includes('--no-color')) useColour = false;
   const config = loadConfig({ env: process.env });
-  process.stdout.write(renderLine(await readStdin(), { useColour, config }) + '\n');
+  const depth = resolveColorDepth(config, process.env);
+  process.stdout.write(renderLine(await readStdin(), { useColour, config, depth }) + '\n');
 }
 
 // Run only when executed directly (`node statusline.js`), never when imported by

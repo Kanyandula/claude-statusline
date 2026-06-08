@@ -822,7 +822,7 @@ test('config selects the theme; unknown theme falls back to minimal', () => {
 });
 
 test('golden: theme=vivid emits truecolor through the entry', () => {
-  const cfgPath = tmpConfig({ theme: 'vivid' });
+  const cfgPath = tmpConfig({ theme: 'vivid', colorDepth: 'truecolor' });
   const r = spawnSync(process.execPath, [ENTRY, '--color'], {
     input: fixture('full'), encoding: 'utf8',
     env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: cfgPath, FORCE_COLOR: '' },
@@ -867,11 +867,58 @@ test('colorize and config dispatch to powerline', () => {
 });
 
 test('golden: layout=powerline renders through the entry', () => {
-  const cfgPath = tmpConfig({ layout: 'powerline' });
+  const cfgPath = tmpConfig({ layout: 'powerline', colorDepth: 'truecolor' });
   const r = spawnSync(process.execPath, [ENTRY, '--color'], {
     input: fixture('full'), encoding: 'utf8',
     env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: cfgPath, FORCE_COLOR: '' },
   });
   assert.equal(r.status, 0);
   assert.ok(r.stdout.includes(PL) && /48;2;/.test(r.stdout));
+});
+
+// ── colorDepth: 256-color fallback (cross-terminal consistency) ──────────────
+// Hex colors downsample to xterm-256 (38;5;N / 48;5;N) when depth is '256', so
+// vivid/powerline render (approximately) on non-truecolor terminals like
+// Apple Terminal. Auto-detect engages 256 for TERM_PROGRAM=Apple_Terminal only;
+// config.colorDepth overrides. Pure colorize/wrap default to truecolor.
+
+import { resolveColorDepth } from './statusline.js';
+
+test('wrap downsamples hex to xterm-256 when depth is 256; truecolor by default', () => {
+  assert.equal(wrap('#bc8cff', 'x', '256'), '\x1b[38;5;141mx\x1b[0m');   // 188,140,255 → cube 141
+  assert.equal(wrap('#bc8cff', 'x'), '\x1b[38;2;188;140;255mx\x1b[0m');  // default unchanged
+});
+
+test('resolveColorDepth: explicit config wins; auto downgrades only Apple Terminal', () => {
+  assert.equal(resolveColorDepth({ colorDepth: '256' }, {}), '256');
+  assert.equal(resolveColorDepth({ colorDepth: 'truecolor' }, { TERM_PROGRAM: 'Apple_Terminal' }), 'truecolor');
+  assert.equal(resolveColorDepth({ colorDepth: 'auto' }, { TERM_PROGRAM: 'Apple_Terminal' }), '256');
+  assert.equal(resolveColorDepth({}, { TERM_PROGRAM: 'iTerm.app' }), 'truecolor');
+  assert.equal(resolveColorDepth({}, {}), 'truecolor');
+});
+
+test('vivid at colorDepth 256 emits 256-color, not truecolor', () => {
+  const [id] = colorize(vmFull, { theme: 'vivid', colorDepth: '256' }, true);
+  assert.ok(id.includes('38;5;'), 'uses 256-color');
+  assert.ok(!id.includes('38;2;'), 'no truecolor escapes');
+});
+
+test('powerline at colorDepth 256 uses 256-color backgrounds', () => {
+  const l = colorize(vmFull, { layout: 'powerline', colorDepth: '256' }, true)[0];
+  assert.ok(l.includes('48;5;') && !l.includes('48;2;'));
+});
+
+test('colorDepth is a validated config field (auto default; bad → auto)', () => {
+  assert.equal(loadConfig({ userPath: '/nope.json', env: {} }).colorDepth, 'auto');
+  assert.equal(loadConfig({ userPath: tmpConfig({ colorDepth: '256' }), env: {} }).colorDepth, '256');
+  assert.equal(loadConfig({ userPath: tmpConfig({ colorDepth: 'neon' }), env: {} }).colorDepth, 'auto');
+});
+
+test('golden: the entry auto-downgrades to 256-color under Apple_Terminal', () => {
+  const r = spawnSync(process.execPath, [ENTRY, '--color'], {
+    input: fixture('full'), encoding: 'utf8',
+    env: { ...process.env, CLAUDE_STATUSLINE_CONFIG: tmpConfig({ theme: 'vivid' }), FORCE_COLOR: '', TERM_PROGRAM: 'Apple_Terminal' },
+  });
+  assert.equal(r.status, 0);
+  assert.ok(r.stdout.includes('38;5;') && !r.stdout.includes('38;2;'), 'downgraded to 256');
 });

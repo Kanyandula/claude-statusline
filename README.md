@@ -102,6 +102,7 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 {
   "layout": "spatial",
   "theme": "minimal",
+  "colorDepth": "auto",
   "separators": "·",
   "defaultWindowSize": 200000,
   "maxProjectWidth": 24,
@@ -123,7 +124,12 @@ wrong-typed values are ignored, so a typo can't blank the bar.
 - `theme` — `minimal` (default: your terminal's ANSI palette, identity plain,
   only context/cost/pixel colored) or `vivid` (the design-mock palette —
   truecolor, colored identity, split green/red LOC, a calm purple pixel that
-  turns red only in the danger band). `vivid` needs a truecolor terminal.
+  turns red only in the danger band).
+- `colorDepth` — `auto` (default), `truecolor`, or `256`. `vivid` and
+  `powerline` use truecolor hex; on a terminal without it the colors break.
+  `auto` keeps truecolor everywhere **except Apple Terminal** (which lacks
+  truecolor), where it downsamples to 256-color so the bar still renders. Set
+  `256` to force the fallback, or `truecolor` to force full color.
 - `fields.burnRate` — append a session-average burn rate (`↑$4.7/h`) after cost.
 - `fields.gitAheadBehind` — show `↑`/`↓` commit counts on the branch segment.
 

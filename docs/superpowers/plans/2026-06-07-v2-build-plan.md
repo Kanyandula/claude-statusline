@@ -194,6 +194,15 @@ never hand-set per field — consistent with the locked rule):
   split green/red LOC, and a calm purple pixel that turns red only in the danger
   band. Needs a truecolor terminal. Opt-in via `theme: "vivid"`.
 
+**Cross-terminal color (2026-06-08):** `vivid`/`powerline` are truecolor; added a
+`colorDepth` config field (`auto`|`truecolor`|`256`). `auto` keeps truecolor
+everywhere except **Apple Terminal** (reliable `TERM_PROGRAM=Apple_Terminal` ID
+— COLORTERM is unreliable there), where it downsamples each hex to xterm-256 so
+the bar renders consistently instead of breaking. Env-detect lives only at the
+entry (`main`); pure `colorize`/`wrap` default to truecolor and take an explicit
+depth, keeping unit tests deterministic. (Font is the orthogonal lever — the
+powerline `` arrows still need a Nerd Font; 256 fixes color, not glyphs.)
+
 Mock-direction coverage: **A spatial** ✅, **B burn-rate** ✅ (opt-in field, not a
 separate layout), **D zen** ✅, **C powerline** ✅ (2026-06-08 — `layout:
 "powerline"`, truecolor background segments + arrow glyphs, Nerd-Font-gated,
