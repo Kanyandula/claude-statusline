@@ -17,11 +17,27 @@ v2 reads a **single** JSON file:
 Set `$CLAUDE_STATUSLINE_CONFIG` to an absolute `*.json` path to read that file
 instead of `~/.claude/statusline.json` (see [Env-var overrides](#8-env-var-overrides)).
 
-There is **no project-level config file** and **no `set`/`enable`/`disable`
-CLI** in v2 — `cli.js` only does `init` and `uninstall` (it wires the script
-into `~/.claude/settings.json`). To change any setting, **edit the JSON file by
-hand.** A missing or malformed file is silently ignored and built-in defaults
-apply, so a typo can never blank the bar.
+There is **no project-level config file** in v2. Change settings either with
+the `config` command or by editing the JSON directly:
+
+```bash
+claude-statusline config list                 # current values + valid options
+claude-statusline config get theme            # print one effective value
+claude-statusline config set theme vivid       # write one key (validated)
+claude-statusline config set thresholds.cost.warn 2   # nested keys use dots
+```
+
+`config set` validates against the same schema the loader uses (an invalid
+value or unknown key is rejected with the valid options, and nothing is
+written), writes only the keys you set (the rest stay defaulted), and **takes
+effect on the next render — no restart needed**, since the renderer re-reads
+the file every render. It also warns if the key you set is currently shadowed
+by an env var (precedence below). A missing or malformed file is silently
+ignored and built-in defaults apply, so a typo can never blank the bar.
+
+> The other two commands, `init` and `uninstall`, wire the script into
+> `~/.claude/settings.json` — that file *is* read once at startup, so those
+> two do require a Claude Code restart.
 
 **Precedence (highest wins):**
 
@@ -273,4 +289,6 @@ Code pipes the output (not a TTY) yet renders ANSI. Run directly, `--color` /
 }
 ```
 
-Save any of these to `~/.claude/statusline.json` and restart Claude Code.
+Apply any of these with `claude-statusline config set <key> <value>`, or write
+the JSON to `~/.claude/statusline.json` directly. Either way it takes effect on
+the next render — no restart needed.

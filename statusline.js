@@ -501,6 +501,8 @@ export function colorize(vm, config = {}, useColour = supportsColor(), depth) {
 // env. Normalized to the known schema (wrong-typed values fall back, unknown
 // keys dropped) so a hand-edited file can't blank the bar or NaN the thresholds.
 
+export const COLOR_DEPTHS = ['auto', 'truecolor', '256'];
+
 export const DEFAULT_CONFIG = {
   layout: 'spatial',
   theme: 'minimal',
@@ -518,7 +520,31 @@ export const DEFAULT_CONFIG = {
   },
 };
 
-function defaultConfigPath() {
+// The keys the `config` CLI can set, with the type used to coerce a string arg
+// and (for enums) the valid values. The values reference the loader's own
+// canonical lists, so a new layout/theme/depth is settable the moment the
+// loader knows it — no second list to update. normalizeConfig stays the
+// validation source of truth; this only describes the settable surface.
+// `env` names the CLAUDE_STATUSLINE_* var that shadows the key (precedence:
+// env > file), so the CLI can warn when a write is being overridden.
+// The reserved fields (apiRatio/outputStyle/rateLimits) are intentionally
+// absent — the loader accepts them but no layout renders them yet.
+export const CONFIG_KEYS = {
+  layout: { type: 'enum', values: IMPLEMENTED_LAYOUTS, env: 'CLAUDE_STATUSLINE_LAYOUT' },
+  theme: { type: 'enum', values: KNOWN_THEMES },
+  colorDepth: { type: 'enum', values: COLOR_DEPTHS },
+  separators: { type: 'string' },
+  defaultWindowSize: { type: 'number' },
+  maxProjectWidth: { type: 'number' },
+  'thresholds.context.warn': { type: 'number' },
+  'thresholds.context.danger': { type: 'number' },
+  'thresholds.cost.warn': { type: 'number' },
+  'thresholds.cost.danger': { type: 'number' },
+  'fields.burnRate': { type: 'boolean' },
+  'fields.gitAheadBehind': { type: 'boolean' },
+};
+
+export function defaultConfigPath() {
   return join(homedir(), '.claude', 'statusline.json');
 }
 
@@ -575,7 +601,7 @@ function normalizeConfig(cfg) {
   return {
     layout: IMPLEMENTED_LAYOUTS.includes(s.layout) ? s.layout : DEFAULT_CONFIG.layout,
     theme: KNOWN_THEMES.includes(s.theme) ? s.theme : DEFAULT_CONFIG.theme,
-    colorDepth: ['auto', 'truecolor', '256'].includes(s.colorDepth) ? s.colorDepth : DEFAULT_CONFIG.colorDepth,
+    colorDepth: COLOR_DEPTHS.includes(s.colorDepth) ? s.colorDepth : DEFAULT_CONFIG.colorDepth,
     separators: typeof s.separators === 'string' && s.separators ? s.separators : DEFAULT_CONFIG.separators,
     defaultWindowSize: finiteNum(s.defaultWindowSize, DEFAULT_CONFIG.defaultWindowSize),
     maxProjectWidth: mpw > 0 ? Math.floor(mpw) : DEFAULT_CONFIG.maxProjectWidth,

@@ -922,3 +922,85 @@ test('golden: the entry auto-downgrades to 256-color under Apple_Terminal', () =
   assert.equal(r.status, 0);
   assert.ok(r.stdout.includes('38;5;') && !r.stdout.includes('38;2;'), 'downgraded to 256');
 });
+
+// ── config CLI: set/get/list over statusline.json ───────────────────────────
+import { run as cliRun, configSet, configGet, configList } from './cli.js';
+
+const tmpCfgPath = () => join(mkdtempSync(join(tmpdir(), 'cscli-')), 'statusline.json');
+
+test('config set writes a valid enum; loadConfig reads it back', () => {
+  const p = tmpCfgPath();
+  const r = configSet('theme', 'vivid', { path: p, env: {} });
+  assert.equal(r.ok, true);
+  assert.equal(r.value, 'vivid');
+  assert.equal(loadConfig({ userPath: p, env: {} }).theme, 'vivid');
+});
+
+test('config set rejects an invalid enum value and writes nothing', () => {
+  const p = tmpCfgPath();
+  const r = configSet('theme', 'neon', { path: p, env: {} });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'bad-value');
+  assert.match(r.message, /minimal/);
+  assert.equal(existsSync(p), false);
+});
+
+test('config set rejects an unknown key', () => {
+  const r = configSet('bogus', 'x', { path: tmpCfgPath(), env: {} });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'unknown-key');
+});
+
+test('config set coerces booleans and numbers; bad inputs rejected', () => {
+  const p = tmpCfgPath();
+  assert.equal(configSet('fields.burnRate', 'true', { path: p, env: {} }).value, true);
+  assert.equal(loadConfig({ userPath: p, env: {} }).fields.burnRate, true);
+  assert.equal(configSet('fields.burnRate', 'yes', { path: p, env: {} }).ok, false);
+  assert.equal(configSet('maxProjectWidth', '30', { path: p, env: {} }).value, 30);
+  assert.equal(configSet('maxProjectWidth', 'wide', { path: p, env: {} }).ok, false);
+});
+
+test('config set on a nested key preserves sibling keys', () => {
+  const p = tmpCfgPath();
+  configSet('theme', 'vivid', { path: p, env: {} });
+  configSet('thresholds.cost.warn', '2', { path: p, env: {} });
+  const c = loadConfig({ userPath: p, env: {} });
+  assert.equal(c.theme, 'vivid');               // preserved
+  assert.equal(c.thresholds.cost.warn, 2);
+  assert.equal(c.thresholds.cost.danger, 20);   // default still applies
+});
+
+test('config get returns the effective value', () => {
+  const p = tmpCfgPath();
+  configSet('layout', 'zen', { path: p, env: {} });
+  assert.equal(configGet('layout', { env: { CLAUDE_STATUSLINE_CONFIG: p } }).value, 'zen');
+});
+
+test('config list reports settable keys and valid options; reserved fields hidden', () => {
+  const rows = configList({ env: {} });
+  const keys = rows.map((r) => r.key);
+  assert.ok(keys.includes('theme') && keys.includes('layout') && keys.includes('thresholds.cost.warn'));
+  assert.equal(rows.find((r) => r.key === 'theme').valid, 'minimal|vivid');
+  assert.ok(!keys.includes('fields.rateLimits'));   // accepted by loader, not settable here
+});
+
+test('config flags a key shadowed by its env override', () => {
+  const shadowed = configList({ env: { CLAUDE_STATUSLINE_LAYOUT: 'compact' } }).find((r) => r.key === 'layout');
+  assert.equal(shadowed.shadowedBy, 'CLAUDE_STATUSLINE_LAYOUT');
+  const r = configSet('layout', 'zen', { path: tmpCfgPath(), env: { CLAUDE_STATUSLINE_LAYOUT: 'compact' } });
+  assert.equal(r.shadowedBy, 'CLAUDE_STATUSLINE_LAYOUT');
+});
+
+test('cli run: config set returns 0 and writes the file', () => {
+  const p = tmpCfgPath();
+  const prev = process.env.CLAUDE_STATUSLINE_CONFIG;
+  process.env.CLAUDE_STATUSLINE_CONFIG = p;
+  try {
+    assert.equal(cliRun(['config', 'set', 'theme', 'vivid']), 0);
+    assert.equal(loadConfig({ userPath: p, env: {} }).theme, 'vivid');
+    assert.equal(cliRun(['config', 'set', 'theme', 'neon']), 2);   // invalid → nonzero
+  } finally {
+    if (prev === undefined) delete process.env.CLAUDE_STATUSLINE_CONFIG;
+    else process.env.CLAUDE_STATUSLINE_CONFIG = prev;
+  }
+});

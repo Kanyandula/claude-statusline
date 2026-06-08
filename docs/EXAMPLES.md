@@ -1,22 +1,26 @@
 # Examples
 
-Recipe gallery for common `claude-statusline` v2 setups. v2 is configured with
-a **single JSON file** at `~/.claude/statusline.json` — there is no `set` /
-`enable` / `layout` CLI (that was v1). Each recipe below is the JSON to drop in
-that file, with a sample of the resulting bar.
+Recipe gallery for common `claude-statusline` v2 setups. Configuration lives in
+a **single JSON file** at `~/.claude/statusline.json`. Apply any recipe below
+with the `config` command:
 
-Sample outputs are shown **plain** (no ANSI color), since color can't render in
-a code block — the structure is what changes between recipes; color is layered
-on top per the thresholds. See [CONFIG.md](CONFIG.md) for the full key
-reference.
+```bash
+claude-statusline config set theme vivid
+claude-statusline config set layout compact
+claude-statusline config list      # show current values + valid options
+```
 
-> **Iterate locally without restarting Claude Code.** Pipe a saved payload
-> through the script and force color on:
+…or write the JSON to the file directly — each recipe shows that JSON. Either
+way it takes effect on the next render (no restart). Sample outputs are shown
+**plain** (no ANSI color), since color can't render in a code block — the
+structure is what changes between recipes; color is layered on top per the
+thresholds. See [CONFIG.md](CONFIG.md) for the full key reference.
+
+> **Iterate locally.** To preview a change without waiting for the next render,
+> pipe a saved payload through the script with color forced on:
 > ```bash
 > FORCE_COLOR=1 node statusline.js < fixtures/full.json
 > ```
-> Edit `~/.claude/statusline.json`, re-run, repeat. Restart Claude Code once
-> you're happy with it.
 
 ---
 

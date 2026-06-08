@@ -94,9 +94,19 @@ stand out. Honors `NO_COLOR` / `FORCE_COLOR`; the installed command passes
 
 ## Configuration
 
-Drop a `~/.claude/statusline.json` (or point `CLAUDE_STATUSLINE_CONFIG` at an
-absolute `*.json`). Defaults apply for anything you omit; unknown keys and
-wrong-typed values are ignored, so a typo can't blank the bar.
+Use the `config` command — it validates the value, writes only the key you set,
+and takes effect on the next render (no restart):
+
+```bash
+claude-statusline config set theme vivid
+claude-statusline config set layout compact
+claude-statusline config list      # current values + valid options
+```
+
+Or edit `~/.claude/statusline.json` directly (point `CLAUDE_STATUSLINE_CONFIG`
+at an absolute `*.json` to use another path). Defaults apply for anything you
+omit; unknown keys and wrong-typed values are ignored, so a typo can't blank
+the bar.
 
 ```json
 {
