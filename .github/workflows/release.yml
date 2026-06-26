@@ -41,5 +41,9 @@ jobs:
 
       # Auth via OIDC Trusted Publishing — no token. Configure on npmjs.com:
       # package Settings -> Trusted Publisher -> Kanyandula/claude-statusline, release.yml
+      #
+      # ponytail: 2.0.0 soaks on @next. Flip to --tag latest (or drop the flag)
+      # before cutting a stable release; promote this build with no republish via
+      #   npm dist-tag add @kanyandula/claude-statusline@2.0.0 latest
       - name: Publish
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag next
