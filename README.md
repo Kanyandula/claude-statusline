@@ -1,377 +1,193 @@
-# claude-statusline
+# claude-statusline v2
 
-[![CI](https://github.com/Kanyandula/claude-statusline/actions/workflows/ci.yml/badge.svg)](https://github.com/Kanyandula/claude-statusline/actions/workflows/ci.yml)
-
-**Current release:** [v1.0.0](https://github.com/Kanyandula/claude-statusline/releases/tag/v1.0.0) — see [CHANGELOG](CHANGELOG.md)
-
-## What it is
-
-A configurable statusline for Claude Code that surfaces the information you
-care about — model and context window, session duration, context %, cost,
-current branch, and LOC delta — without pulling in a single runtime
-dependency. Ships as a single Node.js binary, requires Node ≥ 18, and
-installs in under a minute.
+A fast, dependency-free status line for [Claude Code](https://claude.com/claude-code).
+Identity is plain text; **state is shape and color** — a context bar, a
+health-pixel accent, and threshold-driven semantic color, so you read your
+session at a glance.
 
 ```
-▌  myproject  │  ⎇ main*  │  Opus 4.7 (1M context)
-  ● 31% ctx  │  ⏱ 23h54m  │  $19.01  │  +3225 / -186
+▌ claude-statusline · Opus
+ctx ▰▱▱▱▱▱▱▱▱▱ 8%   · ⏱ 1h47m · $8.40   · +342 / −89
 ```
+
+The leading `▌` takes the color of your **worst** active threshold (context or
+cost), so peripheral vision alone tells you when something needs attention.
+
+- **Two files, zero runtime dependencies.** `statusline.js` (renderer) and
+  `cli.js` (install/uninstall). Node ≥ 18.
+- **Derives everything from Claude Code's stdin** — no hardcoded model tables.
+- **Null-tolerant** — a fresh session or a model without a field renders cleanly,
+  never a crash or a stray `NaN`.
 
 ---
 
 ## Install
 
-```bash
-npm i -g @kanyandula/claude-statusline
-```
-
-**Without npm (locked-down environments)**
+**Primary path — `install.sh`:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Kanyandula/claude-statusline/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Kanyandula/claude-statusline/v2/install.sh | sh
 ```
 
-This installs only the renderer — you won't get the `claude-statusline` CLI.
-Customise by editing `~/.claude/claude-statusline.json` directly using the
-[CONFIG reference](docs/CONFIG.md). Switch to `npm i -g @kanyandula/claude-statusline`
-later if npm becomes available.
+This downloads the two files to `~/.claude/helpers/claude-statusline-v2/` and
+wires the status line into `~/.claude/settings.json` for you (backing the file
+up first, preserving your other settings, and forcing color on). Restart Claude
+Code to see it.
+
+Pass `--force` to overwrite an existing `statusLine` entry:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kanyandula/claude-statusline/v2/install.sh | sh -s -- --force
+```
+
+**From a clone:**
+
+```bash
+git clone -b v2 https://github.com/Kanyandula/claude-statusline.git
+node claude-statusline/cli.js init
+```
+
+> **npm — coming soon.** v2 will publish to `@kanyandula/claude-statusline`
+> once it has soaked. Until then, a bare `npm i -g @kanyandula/claude-statusline`
+> still resolves to **v1**, so use `install.sh` above for v2.
+
+### Uninstall
+
+```bash
+node ~/.claude/helpers/claude-statusline-v2/cli.js uninstall
+```
+
+Removes the `statusLine` entry (and backs the file up); your other settings are
+left untouched.
 
 ---
 
-## Quick start
+## What it shows
 
-```bash
-npm i -g @kanyandula/claude-statusline
-claude-statusline init
-# restart Claude Code — the statusline appears automatically
-```
+| Field | Source | Notes |
+|-------|--------|-------|
+| `▌` health pixel | worst of context / cost | dim when there is no signal yet |
+| project | `workspace.current_dir` | truncated if very long |
+| branch | local `git` | overlaid by the pipeline (lands in a later phase) |
+| model | `model.display_name` | verbatim |
+| size label | `context_window.context_window_size` | shown only for non-default windows (e.g. `1M`) |
+| `ctx` bar + % | `context_window.used_percentage` | 10-cell bar; `--%` on a fresh session |
+| `⏱` duration | `cost.total_duration_ms` | auto-scaled (`45s` / `7m` / `1h47m`) |
+| cost | `cost.total_cost_usd` | |
+| LOC | `cost.total_lines_added` / `_removed` | |
 
-Three commands, done. The `init` subcommand writes the `statusLine` block into
-`~/.claude/settings.json` and points it at the installed binary.
+### Color
 
----
+One threshold mapping drives every colored field and the health pixel:
 
-## Layouts
+| Band | Context | Cost |
+|------|---------|------|
+| green | < 60% | < $5 |
+| yellow | ≥ 60% | ≥ $5 |
+| red | ≥ 85% | ≥ $20 |
 
-Two layouts are available. The default is `two-line`.
-
-### `two-line` (default)
-
-```
-▌  myproject  │  ⎇ main*  │  Sonnet 4.5 (200K context)
-  ● 12% ctx  │  ⏱ 1h3m  │  $0.42  │  +104 / -18
-```
-
-### `single`
-
-```
-▌  myproject  │  ⎇ main*  │  Sonnet 4.5 (200K)  │  ● 12% ctx  │  ⏱ 1h3m  │  $0.42  │  +104/-18
-```
-
-`single` is more compact: it drops " context" from the model label and uses
-tight LOC formatting without spaces around the slash. The other fields keep
-their normal form.
-
-Switch layouts:
-
-```bash
-claude-statusline layout single
-```
-
----
-
-## Field reference
-
-Fields are individually togglable. Two fields are off by default.
-
-| Field | Default | Source | What it shows |
-|---|---|---|---|
-| `project` | on | basename of cwd | Current project/directory name |
-| `branch` | on | single `git status --porcelain=v2 --branch` | Current branch (`(detached)` when detached); `*` suffix when working tree is dirty |
-| `model` | on | `model.display_name` (parsed) | Claude model name + context window size |
-| `ctx` | on | `context_window.used_percentage` | Percentage of context window consumed |
-| `duration` | on | `cost.total_duration_ms` | Wall-clock session time (e.g. `23h54m`) |
-| `cost` | on | `cost.total_cost_usd` | Session USD spend |
-| `loc` | on | `cost.total_lines_added`, `cost.total_lines_removed` | LOC delta for the session |
-| `apiRatio` | **off** | `total_api_duration_ms / total_duration_ms` | Fraction of session time spent waiting on the API |
-| `outputStyle` | **off** | `output_style.name` | Name of the active output style |
+Color is the escalation signal — identity stays plain so the colored fields
+stand out. Honors `NO_COLOR` / `FORCE_COLOR`; the installed command passes
+`--color` because Claude Code pipes our output (not a TTY) yet renders ANSI.
 
 ---
 
 ## Configuration
 
-Config files are resolved in layers (each layer overrides the one above):
+Use the `config` command — it validates the value, writes only the key you set,
+and takes effect on the next render (no restart):
 
-1. `~/.claude/claude-statusline.json` — user-level defaults
-2. `<cwd>/.claude/claude-statusline.json` — project-level overrides
-3. Environment variables — override both files (see [docs/CONFIG.md](docs/CONFIG.md))
+```bash
+claude-statusline config set theme vivid
+claude-statusline config set layout compact
+claude-statusline config list      # current values + valid options
+```
 
-Full schema reference and all available keys are documented in
-[docs/CONFIG.md](docs/CONFIG.md).
-
-### Example config
+Or edit `~/.claude/statusline.json` directly (point `CLAUDE_STATUSLINE_CONFIG`
+at an absolute `*.json` to use another path). Defaults apply for anything you
+omit; unknown keys and wrong-typed values are ignored, so a typo can't blank
+the bar.
 
 ```json
 {
-  "layout": "single",
-  "fields": {
-    "loc": false,
-    "apiRatio": true
-  },
+  "layout": "spatial",
+  "theme": "minimal",
+  "colorDepth": "auto",
+  "separators": "·",
+  "defaultWindowSize": 200000,
+  "maxProjectWidth": 24,
   "thresholds": {
-    "costWarnUsd": 3,
-    "costDangerUsd": 10
+    "context": { "warn": 60, "danger": 85 },
+    "cost":    { "warn": 5,  "danger": 20 }
+  },
+  "fields": {
+    "gitAheadBehind": true,
+    "burnRate": false
   }
 }
 ```
 
----
-
-## CLI reference
-
-All subcommands accept `--help` for command-specific usage.
-
-```
-claude-statusline <subcommand> --help
-```
-
-### `init`
-
-Writes the `statusLine` block into `~/.claude/settings.json` (or the project
-settings file when `--scope project` is passed). Safe to re-run — use
-`--force` to overwrite an existing block.
-
-```bash
-claude-statusline init
-claude-statusline init --scope project --force
-```
-
-Options:
-- `--scope <user|project>` — target settings file (default: `user`)
-- `--force` — overwrite existing `statusLine` block
-
-### `layout`
-
-Switches the active layout. Writes to the user config unless `--scope
-project` is passed.
-
-```bash
-claude-statusline layout two-line
-claude-statusline layout single --scope project
-```
-
-### `enable`
-
-Enables a field by name.
-
-```bash
-claude-statusline enable apiRatio
-claude-statusline enable outputStyle --scope project
-```
-
-### `disable`
-
-Disables a field by name.
-
-```bash
-claude-statusline disable loc
-claude-statusline disable cost --scope project
-```
-
-### `set`
-
-Sets any config key by dot-path. Values are parsed as JSON where possible,
-treated as strings otherwise.
-
-```bash
-claude-statusline set layout single
-claude-statusline set thresholds.costWarnUsd 5
-claude-statusline set fields.loc false --scope project
-```
-
-### `get`
-
-Prints the current resolved config (merged from all layers). Pass a key path
-to read a single value.
-
-```bash
-claude-statusline get
-claude-statusline get layout
-claude-statusline get thresholds.costDangerUsd
-```
-
-### `preview`
-
-Renders the statusline against a sample payload and prints it to the
-terminal. Use `--live` to tail the live Claude Code session in real time.
-
-```bash
-claude-statusline preview
-claude-statusline preview --live
-```
-
-### `reset`
-
-Removes the user (or project) config file, restoring defaults.
-
-```bash
-claude-statusline reset
-claude-statusline reset --scope project
-```
-
-### `uninstall`
-
-Removes the `statusLine` block from `~/.claude/settings.json`. Pass
-`--keep-config` to leave the config file intact.
-
-```bash
-claude-statusline uninstall
-claude-statusline uninstall --keep-config
-```
-
-### `render` (internal)
-
-The `render` subcommand is the hook Claude Code invokes on every tick. It
-reads a JSON payload from stdin and writes the rendered statusline to stdout.
-You should not need to call it directly, but it is useful for debugging (see
-[Troubleshooting](#troubleshooting)).
+- `layout` — `spatial` (default, two lines), `compact` (one line, same fields),
+  `zen` (`project · model · ctx% · cost`, where color is the only signal), or
+  `powerline` (one line of background-filled segments — **needs a Nerd Font**,
+  or the arrow glyphs render as tofu).
+- `theme` — `minimal` (default: your terminal's ANSI palette, identity plain,
+  only context/cost/pixel colored) or `vivid` (the design-mock palette —
+  truecolor, colored identity, split green/red LOC, a calm purple pixel that
+  turns red only in the danger band).
+- `colorDepth` — `auto` (default), `truecolor`, or `256`. `vivid` and
+  `powerline` use truecolor hex; on a terminal without it the colors break.
+  `auto` keeps truecolor everywhere **except Apple Terminal** (which lacks
+  truecolor), where it downsamples to 256-color so the bar still renders. Set
+  `256` to force the fallback, or `truecolor` to force full color.
+- `fields.burnRate` — append a session-average burn rate (`↑$4.7/h`) after cost.
+- `fields.gitAheadBehind` — show `↑`/`↓` commit counts on the branch segment.
 
 ---
 
-## Optional extensions
+## How it works
 
-Two fields are disabled by default because they are situational.
+Claude Code pipes a JSON object to the command on every render. `statusline.js`
+reads **only** from that payload (plus a local `git` call), through a single
+adapter — so a schema change is a one-line fix, never a scattered edit.
 
-### `apiRatio`
+```
+stdin → readPayload (adapter) → spatial layout → colorize (thresholds) → emit
+```
 
-Shows what fraction of session time was spent waiting on the Claude API.
-Useful when profiling slow turns.
+See the [statusLine docs](https://code.claude.com/docs/en/statusline) for the
+full stdin contract.
+
+### On a large monorepo
+
+The branch segment runs a single `git status` per update — and **only** when
+Claude Code re-renders, never on an idle timer. On a big repo, turn on Git's own
+accelerators so that stays fast:
 
 ```bash
-claude-statusline enable apiRatio
+git config core.fsmonitor true
+git config core.untrackedCache true
 ```
 
-Appears as:
+claude-statusline *benefits* from these if you set them but never writes to your
+repo config. If a `git status` ever exceeds ~1s it's dropped for that render —
+the bar shows no branch rather than stalling.
 
-```
-🌐 38%
-```
+---
 
-### `outputStyle`
-
-Shows the name of the currently active output style.
+## Development
 
 ```bash
-claude-statusline enable outputStyle
+node --test test.js     # golden tests pipe real stdin fixtures through the entry point
+node statusline.js < fixtures/full.json                 # render once
+FORCE_COLOR=1 node statusline.js < fixtures/full.json   # with color
 ```
 
-Appears as:
-
-```
-📐 concise
-```
-
-Both fields obey the same `--scope` flag as `enable` and can be toggled per
-project.
-
----
-
-## Troubleshooting
-
-**I ran `init` but nothing shows up in Claude Code.**
-
-Work through this checklist in order:
-
-1. **Check Claude Code version.** The `statusLine` setting was added in a
-   recent Claude Code release. Update to the latest version if you are unsure.
-
-2. **Restart Claude Code completely.** The settings file is read at startup.
-   Run `/exit` inside Claude Code and relaunch — a reload is not enough.
-
-3. **Test the renderer standalone.** The quickest check is `preview`, which
-   renders the bundled sample payload without needing Claude Code running:
-
-   ```bash
-   claude-statusline preview
-   ```
-
-   To exercise the actual stdin path that Claude Code uses, pipe a payload
-   through `render`:
-
-   ```bash
-   echo '{"model":{"display_name":"Opus 4.7 (1M context)"},"workspace":{"current_dir":"'"$PWD"'"}}' | claude-statusline render
-   ```
-
-   If you are working from a clone rather than a global install, the bundled
-   sample lives at `src/fixtures/stdin-sample.json`:
-
-   ```bash
-   cat src/fixtures/stdin-sample.json | node bin/statusline.js
-   ```
-
-   You should see one or two lines of rendered output. If you see an error,
-   that is where to focus.
-
-4. **Verify `settings.json` has the `statusLine` block.**
-
-   ```bash
-   grep -A5 statusLine ~/.claude/settings.json
-   ```
-
-   If the block is missing, re-run `claude-statusline init`.
-
-5. **Run with debug output.** Set `CLAUDE_STATUSLINE_DEBUG=1` before
-   launching Claude Code — errors from the renderer will appear on
-   stderr in the terminal where you started Claude Code.
-
-   ```bash
-   CLAUDE_STATUSLINE_DEBUG=1 claude
-   ```
-
-6. **Inspect captured stdin.** If the renderer runs but the output looks wrong,
-   temporarily wrap the command in `settings.json` with `tee` to capture
-   exactly what Claude Code is sending:
-
-   ```bash
-   # In settings.json, temporarily change the command to:
-   # sh -c 'tee /tmp/claude-stdin.json | claude-statusline render'
-   ```
-
-   Then review `/tmp/claude-stdin.json`, or pipe it through
-   `claude-statusline preview --live` to watch updates in real time.
-
----
-
-## Compatibility
-
-| Environment | Status |
-|---|---|
-| macOS | Tested |
-| Linux | Should work — POSIX-only assumptions |
-| WSL | Should work |
-| Native Windows | Partial — `git` shell-out and tmp paths assume POSIX; PRs welcome |
-| Claude Code version | Requires `statusLine` setting support (recent versions) |
-
----
-
-## Why this exists
-
-Some work environments permit npm-installable tools but block plugin
-installers or sideloaded binaries. Claude Code has no built-in statusline;
-ruflo and similar solutions require an installer that many locked-down
-machines reject. `claude-statusline` is zero-dependency, ships as a single
-file, and is straightforward to audit — making it viable in constrained
-environments where richer tooling is not.
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide — repo layout,
-adding subcommands, commit conventions, code style, and how to run tests.
+Tests run the real entry point against fixtures — the live path, not a mocked
+render.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE) © Ephraim Kanyandula

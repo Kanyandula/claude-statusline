@@ -1,304 +1,199 @@
 # Examples
 
-Recipe gallery for common `claude-statusline` setups. Each recipe shows the
-CLI commands and/or JSON config needed, plus a sample of what the statusline
-looks like. Commands without `--scope` write to the user-level config
-(`~/.claude/claude-statusline.json`).
+Recipe gallery for common `claude-statusline` v2 setups. Configuration lives in
+a **single JSON file** at `~/.claude/statusline.json`. Apply any recipe below
+with the `config` command:
+
+```bash
+claude-statusline config set theme vivid
+claude-statusline config set layout compact
+claude-statusline config list      # show current values + valid options
+```
+
+…or write the JSON to the file directly — each recipe shows that JSON. Either
+way it takes effect on the next render (no restart). Sample outputs are shown
+**plain** (no ANSI color), since color can't render in a code block — the
+structure is what changes between recipes; color is layered on top per the
+thresholds. See [CONFIG.md](CONFIG.md) for the full key reference.
+
+> **Iterate locally.** To preview a change without waiting for the next render,
+> pipe a saved payload through the script with color forced on:
+> ```bash
+> FORCE_COLOR=1 node statusline.js < fixtures/full.json
+> ```
 
 ---
 
-### 1. Just the basics
+### 1. Default (spatial)
 
-For users who want a short bar focused on model, context window, context
-percentage, and cost. Strips out the LOC counter and session duration so the
-bar stays short even in long sessions; project and branch still show.
+No config file needed — this is what you get out of the box: two lines,
+identity above metrics, `minimal` theme (identity plain, color only on context
+/ cost / the `▌` health pixel).
 
-```bash
-claude-statusline layout single
-claude-statusline disable loc
-claude-statusline disable duration
+```json
+{}
 ```
 
-The same result expressed as JSON (write to
-`~/.claude/claude-statusline.json`):
+Sample output:
+
+```
+▌ claude-statusline · Opus
+ctx ▰▱▱▱▱▱▱▱▱▱ 8%   · ⏱ 1h47m · $8.40   · +342 / −89
+```
+
+The model's context-window size is only shown when it differs from
+`defaultWindowSize` (200k) — so an ordinary session omits it, and a 1M session
+shows `· 1M`.
+
+---
+
+### 2. Compact one-liner
+
+Same fields, collapsed onto a single line for narrow terminals or a thin
+status bar.
 
 ```json
 {
-  "layout": "single",
-  "fields": {
-    "loc": false,
-    "duration": false
-  }
+  "layout": "compact"
 }
 ```
 
 Sample output:
 
 ```
-▌  myproject  │  ⎇ main  │  Opus 4.7 (1M)  │  ● 15% ctx  │  $19.01
+▌ claude-statusline · Opus · ctx ▰▱▱▱▱▱▱▱▱▱ 8%   · ⏱ 1h47m · $8.40   · +342 / −89
 ```
-
-Model, context, and cost stay visible alongside project and branch; the bar
-never grows with LOC or duration noise.
 
 ---
 
-### 2. Verbose / debugging
+### 3. Zen
 
-Enable `apiRatio` and `outputStyle` for full visibility into how Claude is
-spending its budget. Useful when you are profiling a session or want to
-understand the output-token ratio.
+The shortest layout: `project · model · ctx% · cost`. No bar, no duration, no
+LOC — color is the only escalation signal, so the line stays calm until context
+or cost crosses a threshold.
 
-```bash
-claude-statusline enable apiRatio
-claude-statusline enable outputStyle
+```json
+{
+  "layout": "zen"
+}
 ```
 
-Both fields are off by default, so only these two commands are needed on top
-of the default config.
-
-Sample output (two-line layout, default):
+Sample output:
 
 ```
-▌  myproject  │  ⎇ main  │  Opus 4.7 (1M context)
-  ● 72% ctx  │  ⏱ 23m14s  │  $4.32  │  🌐 42%  │  📐 normal
+▌ claude-statusline · Opus · 8% · $8.40
 ```
-
-`🌐 42%` is the API ratio field; `📐 normal` is the output style. Both
-sit on the metrics row, after the core fields, in field-registry order.
 
 ---
 
-### 3. Cost watcher
+### 4. Vivid theme
 
-Lower the thresholds so the cost indicator turns yellow and red earlier than
-the defaults ($5 / $20). Useful for personal cost discipline or when running
-on a tight daily budget.
+The design-mock palette: truecolor, colored identity, LOC split green (added) /
+red (removed), and a purple health pixel that turns red only in the danger
+band. The structure is unchanged from the default — the difference is entirely
+color, so force it on to see it.
 
-```bash
-claude-statusline set thresholds.costWarnUsd 1
-claude-statusline set thresholds.costDangerUsd 5
+```json
+{
+  "theme": "vivid",
+  "colorDepth": "truecolor"
+}
 ```
 
-Equivalent JSON:
+On Apple Terminal (no truecolor), drop `colorDepth` and the default `auto`
+downsamples to xterm-256 so the colors still render — set `truecolor`
+explicitly only on a terminal you know supports it.
+
+---
+
+### 5. Powerline (needs a Nerd Font)
+
+One line of background-filled segments joined by the powerline arrow ``. This
+layout **requires a Nerd Font** for the arrow and branch glyphs — without one
+they render as tofu (`▯`). It uses its own truecolor palette and ignores
+`theme`.
+
+```json
+{
+  "layout": "powerline"
+}
+```
+
+Powerline only looks right with color **and** a Nerd Font in your terminal;
+with color stripped it degrades to a plain field list, so there's no
+representative plain sample to show here — try it live with
+`FORCE_COLOR=1 node statusline.js < fixtures/full.json`.
+
+---
+
+### 6. Cost watcher
+
+Lower the cost thresholds so the `$` field turns yellow and red earlier than
+the defaults ($5 / $20). Useful for personal cost discipline.
 
 ```json
 {
   "thresholds": {
-    "costWarnUsd": 1,
-    "costDangerUsd": 5
+    "cost": { "warn": 1, "danger": 5 }
   }
 }
 ```
 
-The display is identical to the default — only the colour of the `$` cost
-field changes. It goes **yellow** at $1 instead of $5, and **red** at $5
-instead of $20. No other fields are affected.
+The layout is unchanged — only the **color** of the cost field shifts: yellow
+at $1 (instead of $5), red at $5 (instead of $20). Context thresholds are
+untouched. (`danger` must stay above `warn`, or the red band never appears — the
+loader does not enforce the ordering.)
 
 ---
 
-### 4. Per-project override
+### 7. Burn rate + branch tracking
 
-Apply a different layout to a single project without touching your global
-config. Useful for a project where your terminal is narrower, or where you
-simply don't need the full two-line layout.
+Append a session-average burn rate after cost, and keep the `↑`/`↓`
+ahead/behind commit counts on the branch (on by default — set `false` to drop
+them and show just the branch name).
 
-```bash
-cd ~/projects/narrow-terminal
-claude-statusline layout single --scope=project
-claude-statusline disable loc --scope=project
+```json
+{
+  "fields": {
+    "burnRate": true,
+    "gitAheadBehind": true
+  }
+}
 ```
 
-`--scope=project` writes to `<cwd>/.claude/claude-statusline.json`. When
-Claude Code is open in that directory, the project config is layered on top
-of your user config; all other projects are unaffected.
-
-You can confirm the effective values (user + project merged) by `cd`-ing into
-the project directory first:
-
-```bash
-cd ~/projects/narrow-terminal
-claude-statusline get   # merges user + project config; shows effective values
-```
-
-`get` always prints the merged view — there is no `--scope` flag on `get`.
-
-To revert the project override only:
-
-```bash
-claude-statusline reset --scope=project
-```
-
-Sample output in that project:
+Sample output (1M-window session in a dirty `v2` branch, $23.50 spent):
 
 ```
-▌  narrow-terminal  │  ⎇ main  │  Sonnet 4.5 (200K)  │  ● 8% ctx  │  ⏱ 4m2s  │  $0.47
+▌ claude-statusline-v2 · v2* · Opus 4.8 · 1M
+ctx ▰▰▰▰▰▰▰▱▱▱ 72%  · ⏱ 1h47m · $23.50  · ↑$13/h · +342 / −89
 ```
+
+`↑$13/h` is the burn rate (session-average `cost / wall-clock hours`); `v2*`
+shows the branch with a `*` dirty marker; `1M` appears because the window size
+differs from the 200k default.
 
 ---
 
-### 5. Work laptop / locked-down environment
+### 8. No color / locked-down environment
 
-For machines where terminals may not render ANSI colour codes reliably, or
-where policy discourages colour output. Set `NO_COLOR=1` and keep fields
-minimal.
-
-```bash
-export NO_COLOR=1
-claude-statusline init
-claude-statusline disable apiRatio   # already off by default — illustrative
-```
-
-`NO_COLOR=1` can be set for the current session only, or persisted in your
-shell rc file:
+For terminals that don't render ANSI reliably, or where policy discourages
+color. Set `NO_COLOR` in your shell — it disables all color regardless of
+config (and wins over `FORCE_COLOR`).
 
 ```bash
 # ~/.zshrc or ~/.bashrc
 export NO_COLOR=1
 ```
 
-When `NO_COLOR` is set, `claude-statusline` emits no ANSI escape codes — the
-statusline is plain text. All other config options (fields, thresholds,
-layout) still apply; they just render without colour or bold.
-
-Sample output with `NO_COLOR=1` (default two-line layout):
-
-```
-▌  myproject  │  ⎇ main  │  Opus 4.7 (1M context)
-  ● 15% ctx  │  ⏱ 23h54m  │  $19.01  │  +3225 / -186
-```
-
-The `▌` leader and `│` separators are still Unicode characters, but no colour
-escape sequences are embedded in the string.
+Every layout, threshold, and field still applies — the bar just renders as
+plain text (the `▌` pixel and `·` separators are plain Unicode, not color
+escapes). The sample outputs throughout this file are exactly what `NO_COLOR`
+produces.
 
 ---
 
-### 6. Live preview workflow
-
-Iterate on your config and see the result immediately, without restarting
-Claude Code. This involves a temporary modification to `settings.json` to
-capture the stdin JSON that Claude Code passes on each prompt.
-
-**Step 1 — capture the live payload (temporary change).**
-
-Open `~/.claude/settings.json` and find the `statusLine` block that
-`claude-statusline init` wrote:
-
-```json
-"statusLine": {
-  "command": "claude-statusline render"
-}
-```
-
-Temporarily replace it with a `tee` wrapper:
-
-```json
-"statusLine": {
-  "command": "sh -c 'tee /tmp/claude-stdin.json | claude-statusline render'"
-}
-```
-
-This is a **debugging tool only** — revert the change after capturing a sample
-payload. The `tee` adds a small write on every prompt, so don't leave it in
-place permanently.
-
-**Step 2 — trigger one Claude Code prompt** so that `/tmp/claude-stdin.json`
-is populated.
-
-**Step 3 — restore `settings.json`** to the original single-command form.
-
-**Step 4 — iterate locally.**
-
-```bash
-claude-statusline layout single
-claude-statusline preview --live
-# adjust config, repeat
-```
-
-`preview --live` reads from `/tmp/claude-stdin.json` by default. To use a
-different path, set `CLAUDE_STATUSLINE_LIVE_PATH`:
-
-```bash
-CLAUDE_STATUSLINE_LIVE_PATH=~/my-session.json claude-statusline preview --live
-```
-
-This lets you keep reference payloads from different session types (long
-context, high cost, dirty branch, etc.) and preview against each.
-
----
-
-### 7. Compact mode for narrow terminals
-
-Strip every non-essential field so only model, context, and cost remain.
-Fits comfortably in an 80-column terminal.
-
-```bash
-claude-statusline layout single
-claude-statusline disable project
-claude-statusline disable branch
-claude-statusline disable loc
-claude-statusline disable duration
-```
-
-Equivalent JSON:
-
-```json
-{
-  "layout": "single",
-  "fields": {
-    "project": false,
-    "branch": false,
-    "loc": false,
-    "duration": false
-  }
-}
-```
-
-Sample output:
-
-```
-▌  Opus 4.7 (1M)  │  ● 15% ctx  │  $19.01
-```
-
-Only the three fields that matter at a glance — model, context pressure, and
-cost — are shown. The `▌` leader still signals the Claude Code turn boundary.
-
----
-
-### 8. High-cost session monitoring
-
-Combine `apiRatio` with aggressive thresholds to turn `claude-statusline` into
-a lightweight cost dashboard. The red `$` jump-out happens much earlier than
-the default, giving you an at-a-glance signal when a session is running away.
-
-```bash
-claude-statusline enable apiRatio
-claude-statusline set thresholds.costWarnUsd 2
-claude-statusline set thresholds.costDangerUsd 10
-```
-
-Equivalent JSON:
-
-```json
-{
-  "fields": {
-    "apiRatio": true
-  },
-  "thresholds": {
-    "costWarnUsd": 2,
-    "costDangerUsd": 10
-  }
-}
-```
-
-Sample output at $11 into a session:
-
-```
-▌  myproject  │  ⎇ main  │  Opus 4.7 (1M context)
-  ● 55% ctx  │  ⏱ 41m3s  │  $11.20  │  🌐 61%
-```
-
-The `$11.20` renders in **red** (past the $10 danger threshold). The
-`🌐 61%` shows that 61% of wall time was spent waiting on the API — a useful
-signal when debugging why a session is expensive. This combination is particularly
-useful for tracking personal Claude API spend across long research sessions.
+> **Reserved fields.** v1 examples that toggled individual core fields
+> (`disable loc`, `disable duration`) or enabled `apiRatio` / `outputStyle` do
+> **not** apply to v2 — core segments aren't individually toggleable (pick a
+> `layout` instead), and `apiRatio` / `outputStyle` / `rateLimits` are accepted
+> but not yet rendered. See [CONFIG.md §6](CONFIG.md#6-fields).
